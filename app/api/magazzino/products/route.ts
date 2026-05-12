@@ -75,6 +75,9 @@ type ProductDbRow = {
   id: string;
   name: string | null;
   sku: string | null;
+  ean: string | null;
+  udi_di: string | null;
+  hibc_primary: string | null;
   metadata: unknown;
   category: string | null;
   min_stock_level: number | null;
@@ -247,7 +250,14 @@ function applyFiltersAndSort(rows: ProductRow[], query: string, sortField: Produ
     });
 
   const list = rows.filter((p) => {
-    const baseMatch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.category ?? "").toLowerCase().includes(q);
+    const baseMatch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
+      (p.category ?? "").toLowerCase().includes(q) ||
+      (p.ean ?? "").toLowerCase().includes(q) ||
+      (p.udi ?? "").toLowerCase().includes(q) ||
+      (p.hibc ?? "").toLowerCase().includes(q);
     if (!baseMatch) return false;
     if (!matchesAdvancedFilters(p)) return false;
     return true;
@@ -327,7 +337,7 @@ export async function GET(req: NextRequest) {
     await Promise.all([
       supabase
         .from("products")
-        .select("id,name,sku,metadata,category,min_stock_level,image_url")
+        .select("id,name,sku,ean,udi_di,hibc_primary,metadata,category,min_stock_level,image_url")
         .eq("clinic_id", clinicId),
       supabase.from("brands").select("name,image_url"),
       supabase
@@ -418,9 +428,9 @@ export async function GET(req: NextRequest) {
       id: p.id,
       sku: p.sku?.trim() || getSkuFromMetadata(p.metadata) || "",
       name: p.name ?? "—",
-      ean: getEanFromMetadata(p.metadata),
-      udi: getUdiFromMetadata(p.metadata),
-      hibc: getHibcFromMetadata(p.metadata),
+      ean: p.ean?.trim() || getEanFromMetadata(p.metadata),
+      udi: p.udi_di?.trim() || getUdiFromMetadata(p.metadata),
+      hibc: p.hibc_primary?.trim() || getHibcFromMetadata(p.metadata),
       brand: getBrandFromMetadata(p.metadata) ?? p.category ?? null,
       brandImageUrl: brandImageByName.get((getBrandFromMetadata(p.metadata) ?? p.category ?? "").trim().toLowerCase()) ?? null,
       imageUrl: p.image_url ?? null,

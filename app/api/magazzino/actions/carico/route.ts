@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { splitProductIdentifierForInsert } from "@/app/magazzino/lib/productIdentifierColumns";
 import type { Database } from "@/lib/supabase.types";
 
 type CaricoLotInput = {
@@ -101,13 +102,14 @@ async function resolveProductId(
 
   const brand = cleanString(input.brand);
   const sku = cleanString(input.sku);
-  const ean = cleanString(input.ean);
+  const scanLine = cleanString(input.ean);
+  const { ean, udi_di, hibc_primary, metadataEan } = splitProductIdentifierForInsert(scanLine);
   const metadata =
-    brand || sku || ean
+    brand || sku || metadataEan
       ? {
           ...(brand ? { brand } : {}),
           ...(sku ? { sku } : {}),
-          ...(ean ? { ean } : {}),
+          ...(metadataEan ? { ean: metadataEan } : {}),
         }
       : null;
   const minStockRaw = typeof input.minStockLevel === "number" && Number.isFinite(input.minStockLevel) ? input.minStockLevel : 0;
@@ -122,6 +124,9 @@ async function resolveProductId(
     min_stock_level: minStockRaw,
     image_url: imageUrl,
     description,
+    ean,
+    udi_di,
+    hibc_primary,
     metadata,
     master_catalogue_id: masterCatalogueId,
   };
