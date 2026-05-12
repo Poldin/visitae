@@ -27,7 +27,7 @@ type ScanState = "idle" | "scanning" | "success" | "error";
 
 const TAB_UI: Record<BippaTab, { icon: React.ElementType; label: string; badge?: string }> = {
   camera: { icon: Camera, label: "Fotocamera" },
-  phone: { icon: Smartphone, label: "Telefono", badge: "Consigliato" },
+  phone: { icon: Smartphone, label: "Telefono" },
   manual: { icon: Keyboard, label: "Manuale" },
 };
 
@@ -480,6 +480,18 @@ export function BippaScanExperience({
                 Ferma fotocamera
               </button>
             )}
+
+            {variant === "showcase" && lastCode && !showProductPanel && (
+              <div className="mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5">
+                <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm font-semibold text-emerald-100">{lastCode}</p>
+                  {lastFormat && (
+                    <p className="text-xs text-emerald-300/90">{formatBarcodeLabel(lastFormat)}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -532,19 +544,6 @@ export function BippaScanExperience({
                       </div>
                     ) : null}
                     {phoneSessionReady && qrUrl && <QRCode value={qrUrl} size={180} />}
-                  </div>
-
-                  <div
-                    className={`flex items-center gap-1.5 text-xs font-medium ${
-                      phoneConnected ? (variant === "showcase" ? "text-emerald-400" : "text-emerald-600") : bodyText
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        phoneConnected ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.7)]" : "bg-slate-300 dark:bg-zinc-600"
-                      }`}
-                    />
-                    {phoneConnected ? "Dispositivo connesso" : "In attesa del dispositivo…"}
                   </div>
                 </div>
 
@@ -613,7 +612,7 @@ export function BippaScanExperience({
           </div>
         )}
 
-        {lastCode && !showProductPanel && (
+        {lastCode && !showProductPanel && !(variant === "showcase" && activeTab === "camera") && (
           <div className={successBanner}>
             <CheckCircle2 size={16} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
             <div className="min-w-0">

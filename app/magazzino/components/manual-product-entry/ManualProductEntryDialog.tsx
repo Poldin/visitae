@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT, intentToHeaderMode } from "./constants";
-import { EanScannerOverlay } from "./EanScannerOverlay";
 import { inventoryUnitPriceFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
 import { ManualProductEntryHeader } from "./ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./ManualProductEntryIdentityFields";
@@ -43,7 +42,6 @@ export function ManualProductEntryDialog({
   const [brandLoading, setBrandLoading] = useState(false);
   const [manualSku, setManualSku] = useState("");
   const [manualEan, setManualEan] = useState("");
-  const [eanScannerOpen, setEanScannerOpen] = useState(false);
   const [manualDescription, setManualDescription] = useState("");
   const [manualLots, setManualLots] = useState<ManualLotRow[]>([
     { id: "lot-1", quantity: "1", lotCode: "", price: "", vat: "", expiryDate: "", location: "" },
@@ -93,7 +91,6 @@ export function ManualProductEntryDialog({
     if (!open) return;
     setSaving(false);
     setSubmitError(null);
-    setEanScannerOpen(false);
     setManualDescription("");
     const m = intentToHeaderMode(titleIntent);
     if (m === "scarico" || m === "inventario") {
@@ -344,10 +341,6 @@ export function ManualProductEntryDialog({
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (eanScannerOpen) {
-          setEanScannerOpen(false);
-          return;
-        }
         if (modeDropdownOpen) {
           setModeDropdownOpen(false);
           return;
@@ -357,7 +350,7 @@ export function ManualProductEntryDialog({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, eanScannerOpen, modeDropdownOpen]);
+  }, [open, onClose, modeDropdownOpen]);
 
   const normalizedBrandSearch = brandSearch.trim();
   const exactBrandMatch = useMemo(
@@ -1014,7 +1007,6 @@ export function ManualProductEntryDialog({
           <ManualProductEntryIdentityFields
             manualEan={manualEan}
             onManualEanChange={setManualEan}
-            onOpenEanScanner={() => setEanScannerOpen(true)}
             manualName={manualName}
             onManualNameChange={setManualName}
             brandBoxRef={brandBoxRef}
@@ -1081,8 +1073,6 @@ export function ManualProductEntryDialog({
           />
         </div>
       </div>
-
-      <EanScannerOverlay open={eanScannerOpen} onClose={() => setEanScannerOpen(false)} />
     </div>
   );
 }

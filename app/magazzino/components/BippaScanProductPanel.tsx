@@ -863,7 +863,6 @@ export function BippaScanProductPanel({
           <ManualProductEntryIdentityFields
             manualEan={manualEan}
             onManualEanChange={setManualEan}
-            onOpenEanScanner={() => {/* EAN already scanned */}}
             manualName={manualName}
             onManualNameChange={setManualName}
             brandBoxRef={brandBoxRef}

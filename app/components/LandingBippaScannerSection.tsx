@@ -16,7 +16,7 @@ export default function LandingBippaScannerSection() {
             </h2>
             <p className="max-w-xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400 md:text-base">
               Scansiona i codici dei prodotti e modifica la giacenza: tutto è pensato per darti la massima velocità.
-              Prova Fotocamera o Telefono nell&apos;anteprima qui accanto.
+              Provalo dal tuo dispositivo preferito.
             </p>
           </div>
 

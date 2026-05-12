@@ -1,13 +1,12 @@
 "use client";
 
-import { Barcode, ImagePlus } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import type { RefObject } from "react";
 import type { BrandOption, ManualProductCatalogPrefill } from "./types";
 
 type ManualProductEntryIdentityFieldsProps = {
   manualEan: string;
   onManualEanChange: (v: string) => void;
-  onOpenEanScanner: () => void;
   manualName: string;
   onManualNameChange: (v: string) => void;
   brandBoxRef: RefObject<HTMLDivElement | null>;
@@ -36,7 +35,6 @@ type ManualProductEntryIdentityFieldsProps = {
 export function ManualProductEntryIdentityFields({
   manualEan,
   onManualEanChange,
-  onOpenEanScanner,
   manualName,
   onManualNameChange,
   brandBoxRef,
@@ -75,15 +73,6 @@ export function ManualProductEntryIdentityFields({
                 placeholder="Inserisci codice"
                 className="h-9 w-full rounded-md border border-slate-200 px-3 pr-10 text-sm text-slate-600"
               />
-              <button
-                type="button"
-                onClick={onOpenEanScanner}
-                className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                title="Scannerizza codice a barre"
-                aria-label="Scannerizza codice a barre"
-              >
-                <Barcode size={14} />
-              </button>
             </div>
           </div>
           <div>

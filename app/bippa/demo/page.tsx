@@ -72,8 +72,8 @@ export default function BippaDemoPage() {
           <ScanBarcode size={20} strokeWidth={2} />
         </span>
         <div>
-          <p className="text-sm font-semibold leading-tight text-white">Bippa — prova sul telefono</p>
-          <p className="text-xs text-slate-400">Demo: la lettura resta su questo dispositivo</p>
+          <p className="text-sm font-semibold leading-tight text-white">Bippa!</p>
+          <p className="text-xs text-slate-400">scannerizza codici ean, datamatrix o altri formati</p>
         </div>
       </div>
 
@@ -132,7 +132,7 @@ export default function BippaDemoPage() {
                 <div>
                   <p className="mb-1 font-semibold text-white">Pronto per scansionare</p>
                   <p className="text-sm text-slate-400">
-                    Avvia la fotocamera e inquadra un codice: EAN, Data Matrix e altri formati supportati da Bippa.
+                    Avvia la fotocamera e inquadra un codice: EAN, Data Matrix e altri formati supportati.
                   </p>
                 </div>
               </>
