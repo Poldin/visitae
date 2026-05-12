@@ -28,9 +28,8 @@ export default function LandingBippaScannerSection() {
               <div>
                 <p className="font-semibold text-zinc-900 dark:text-zinc-100">Scegli come leggere il codice</p>
                 <p className="mt-1 leading-relaxed">
-                  La tab <strong className="text-zinc-800 dark:text-zinc-200">Telefono</strong> mostra un QR che apre lo
-                  scanner sul cellulare, collegato a questa finestra tramite un token temporaneo — senza effettuare
-                  l&apos;accesso.
+                  La tab <strong className="text-zinc-800 dark:text-zinc-200">Telefono</strong> offre un QR che apre la
+                  demo sul cellulare: scansioni e risultato restano sul telefono, senza collegamento al PC.
                 </p>
               </div>
             </li>
@@ -67,7 +66,7 @@ export default function LandingBippaScannerSection() {
                 variant="showcase"
                 initialTab="phone"
                 visibleTabs={["camera", "phone"]}
-                bootstrapAnonymousForRemoteScan
+                phoneQrStaticPath="/bippa/demo"
               />
             </div>
           </div>

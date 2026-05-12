@@ -43,10 +43,10 @@ export type BippaScanExperienceProps = {
   /** Default: camera, phone, manual. Omitted tabs are hidden. */
   visibleTabs?: readonly BippaTab[];
   /**
-   * Home / anteprima: ottiene JWT per Realtime da `POST /api/bippa/demo-session` (firmato con SUPABASE_JWT_SECRET),
-   * senza login né Anonymous sign-ins su Supabase.
+   * Se impostato (es. `"/bippa/demo"` per la home), la tab Telefono mostra solo un QR che apre quell’URL sul dispositivo,
+   * senza Realtime o sessioni — la scansione avviene tutta sul telefono.
    */
-  bootstrapAnonymousForRemoteScan?: boolean;
+  phoneQrStaticPath?: string;
   /** Top row (e.g. dialog title + close). Omit for embedded landing demos. */
   header?: React.ReactNode;
   enableKeyboardShortcuts?: boolean;
@@ -113,7 +113,7 @@ export function BippaScanExperience({
   variant = "default",
   initialTab = "phone",
   visibleTabs,
-  bootstrapAnonymousForRemoteScan = false,
+  phoneQrStaticPath,
   header,
   enableKeyboardShortcuts = false,
   onKeyboardClose,
@@ -141,7 +141,9 @@ export function BippaScanExperience({
   const [phoneSessionReady, setPhoneSessionReady] = useState(false);
   const phoneChannelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
 
-  const [demoSessionError, setDemoSessionError] = useState<string | null>(null);
+  const phoneLinkOnly = Boolean(phoneQrStaticPath?.length);
+
+  const [staticPhoneQrUrl, setStaticPhoneQrUrl] = useState<string | null>(null);
 
   const [manualCode, setManualCode] = useState("");
   const manualInputRef = useRef<HTMLInputElement>(null);
@@ -151,6 +153,15 @@ export function BippaScanExperience({
   const [lastFormat, setLastFormat] = useState<string | null>(null);
 
   const prevActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!phoneQrStaticPath || typeof window === "undefined") {
+      setStaticPhoneQrUrl(null);
+      return;
+    }
+    const path = phoneQrStaticPath.startsWith("/") ? phoneQrStaticPath : `/${phoneQrStaticPath}`;
+    setStaticPhoneQrUrl(`${window.location.origin}${path}`);
+  }, [phoneQrStaticPath]);
 
   useEffect(() => {
     scanStateRef.current = scanState;
@@ -173,7 +184,6 @@ export function BippaScanExperience({
       setPhoneSessionReady(false);
       setSessionId(null);
       setQrToken(null);
-      setDemoSessionError(null);
       const tab = resolvedTabs.includes(initialTab) ? initialTab : (resolvedTabs[0] ?? "phone");
       setActiveTab(tab);
     }
@@ -228,13 +238,14 @@ export function BippaScanExperience({
   }, [activeTab, active]);
 
   useEffect(() => {
+    if (phoneLinkOnly && activeTab === "phone") return;
     if (activeTab !== "phone" || !active) {
       phoneChannelRef.current?.unsubscribe();
       phoneChannelRef.current = null;
       setPhoneConnected(false);
       setPhoneSessionReady(false);
     }
-  }, [activeTab, active]);
+  }, [activeTab, active, phoneLinkOnly]);
 
   const startCamera = async () => {
     if (!videoRef.current) return;
@@ -262,6 +273,8 @@ export function BippaScanExperience({
   };
 
   const startPhoneSession = useCallback(async () => {
+    if (phoneLinkOnly) return;
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) return;
@@ -271,42 +284,13 @@ export function BippaScanExperience({
     setPhoneSessionReady(false);
     setPhoneConnected(false);
 
-    let sid: string;
-    let token: string;
+    const supabase = getSupabaseAuthClient();
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
 
-    if (bootstrapAnonymousForRemoteScan) {
-      setDemoSessionError(null);
-      try {
-        const res = await fetch("/api/bippa/demo-session", { method: "POST" });
-        const body = (await res.json().catch(() => ({}))) as {
-          sessionId?: string;
-          token?: string;
-          error?: string;
-        };
-        if (!res.ok) {
-          setDemoSessionError(body.error ?? `Errore server (${res.status}).`);
-          return;
-        }
-        if (!body.sessionId || !body.token) {
-          setDemoSessionError("Risposta demo-session non valida.");
-          return;
-        }
-        sid = body.sessionId;
-        token = body.token;
-      } catch (e) {
-        setDemoSessionError(e instanceof Error ? e.message : "Rete non disponibile.");
-        return;
-      }
-    } else {
-      const supabase = getSupabaseAuthClient();
-      if (!supabase) return;
-      const { data } = await supabase.auth.getSession();
-      const t = data?.session?.access_token;
-      if (!t) return;
-      token = t;
-      sid = crypto.randomUUID();
-    }
-
+    const sid = crypto.randomUUID();
     setSessionId(sid);
     setQrToken(token);
 
@@ -328,25 +312,18 @@ export function BippaScanExperience({
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") setPhoneSessionReady(true);
     });
-  }, [handleCode, bootstrapAnonymousForRemoteScan]);
+  }, [handleCode, phoneLinkOnly]);
 
   useEffect(() => {
+    if (phoneLinkOnly) return;
     if (activeTab !== "phone" || !active) return;
-    if (bootstrapAnonymousForRemoteScan && demoSessionError) return;
     if (!phoneSessionReady) {
       void startPhoneSession();
     }
-  }, [
-    activeTab,
-    active,
-    phoneSessionReady,
-    startPhoneSession,
-    bootstrapAnonymousForRemoteScan,
-    demoSessionError,
-  ]);
+  }, [activeTab, active, phoneSessionReady, startPhoneSession, phoneLinkOnly]);
 
   const qrUrl =
-    sessionId && qrToken
+    !phoneLinkOnly && sessionId && qrToken
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/bippa/${sessionId}#${qrToken}`
       : null;
 
@@ -508,34 +485,72 @@ export function BippaScanExperience({
 
         {activeTab === "phone" && (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <p className={`text-xs leading-relaxed ${bodyText}`}>
-              {bootstrapAnonymousForRemoteScan ? (
-                <>
-                  Scansiona questo QR con il telefono: si apre lo scanner remoto collegato a questa anteprima. Il
-                  collegamento usa un token temporaneo generato dal sito — senza effettuare l&apos;accesso.
-                </>
-              ) : (
-                <>
+            {phoneLinkOnly ? (
+              <>
+                <p className={`text-xs leading-relaxed ${bodyText}`}>
+                  Scansiona il QR con il telefono: si apre una pagina demo dove puoi usare la fotocamera e leggere i codici.
+                  Tutto resta sul dispositivo — niente collegamento con questa finestra.
+                </p>
+                <div className="flex flex-col items-center gap-3">
+                  <div
+                    className={
+                      variant === "showcase"
+                        ? "relative flex h-52 w-52 items-center justify-center rounded-2xl border border-emerald-500/30 bg-white p-3 shadow-[0_0_40px_-12px_rgba(16,185,129,0.45)]"
+                        : "relative flex h-52 w-52 items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    }
+                  >
+                    {staticPhoneQrUrl ? (
+                      <QRCode value={staticPhoneQrUrl} size={180} />
+                    ) : (
+                      <div className={`flex flex-col items-center gap-2 ${variant === "showcase" ? "text-zinc-500" : "text-slate-400"}`}>
+                        <Loader2 size={24} className="animate-spin" />
+                        <p className="text-xs">Preparazione QR…</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={`text-xs leading-relaxed ${bodyText}`}>
                   Scansiona questo QR con un altro dispositivo (ad es. il tuo smartphone) per aprire lo scanner remoto già
-                  autenticato.
-                </>
-              )}
-            </p>
+                  autenticato col tuo account. Le letture compaiono qui.
+                </p>
 
-            {demoSessionError && (
-              <div
-                className={
-                  variant === "showcase"
-                    ? "rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2.5 text-xs text-red-200"
-                    : "rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800"
-                }
-              >
-                <p className="font-medium">Collegamento non disponibile</p>
-                <p className="mt-1 leading-relaxed opacity-90">{demoSessionError}</p>
+                <div className="flex flex-col items-center gap-3">
+                  <div
+                    className={
+                      variant === "showcase"
+                        ? "relative flex h-52 w-52 items-center justify-center rounded-2xl border border-emerald-500/30 bg-white p-3 shadow-[0_0_40px_-12px_rgba(16,185,129,0.45)]"
+                        : "relative flex h-52 w-52 items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                    }
+                  >
+                    {!phoneSessionReady ? (
+                      <div className={`flex flex-col items-center gap-2 ${variant === "showcase" ? "text-zinc-500" : "text-slate-400"}`}>
+                        <Loader2 size={24} className="animate-spin" />
+                        <p className="text-xs">Generazione sessione…</p>
+                      </div>
+                    ) : null}
+                    {phoneSessionReady && qrUrl && <QRCode value={qrUrl} size={180} />}
+                  </div>
+
+                  <div
+                    className={`flex items-center gap-1.5 text-xs font-medium ${
+                      phoneConnected ? (variant === "showcase" ? "text-emerald-400" : "text-emerald-600") : bodyText
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        phoneConnected ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.7)]" : "bg-slate-300 dark:bg-zinc-600"
+                      }`}
+                    />
+                    {phoneConnected ? "Dispositivo connesso" : "In attesa del dispositivo…"}
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
-                    setDemoSessionError(null);
                     phoneChannelRef.current?.unsubscribe();
                     phoneChannelRef.current = null;
                     setPhoneSessionReady(false);
@@ -546,67 +561,15 @@ export function BippaScanExperience({
                   }}
                   className={
                     variant === "showcase"
-                      ? "mt-2 text-xs font-semibold text-red-100 underline-offset-2 hover:underline"
-                      : "mt-2 text-xs font-semibold text-red-700 underline-offset-2 hover:underline"
+                      ? "flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-800/60 px-4 py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
+                      : "flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-95"
                   }
                 >
-                  Riprova
+                  <RefreshCw size={13} />
+                  Rigenera sessione
                 </button>
-              </div>
+              </>
             )}
-
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className={
-                  variant === "showcase"
-                    ? "relative flex h-52 w-52 items-center justify-center rounded-2xl border border-emerald-500/30 bg-white p-3 shadow-[0_0_40px_-12px_rgba(16,185,129,0.45)]"
-                    : "relative flex h-52 w-52 items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-                }
-              >
-                {!demoSessionError && !phoneSessionReady ? (
-                  <div className={`flex flex-col items-center gap-2 ${variant === "showcase" ? "text-zinc-500" : "text-slate-400"}`}>
-                    <Loader2 size={24} className="animate-spin" />
-                    <p className="text-xs">Generazione sessione…</p>
-                  </div>
-                ) : null}
-                {!demoSessionError && phoneSessionReady && qrUrl && <QRCode value={qrUrl} size={180} />}
-              </div>
-
-              <div
-                className={`flex items-center gap-1.5 text-xs font-medium ${
-                  phoneConnected ? (variant === "showcase" ? "text-emerald-400" : "text-emerald-600") : bodyText
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    phoneConnected ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.7)]" : "bg-slate-300 dark:bg-zinc-600"
-                  }`}
-                />
-                {phoneConnected ? "Dispositivo connesso" : "In attesa del dispositivo…"}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setDemoSessionError(null);
-                phoneChannelRef.current?.unsubscribe();
-                phoneChannelRef.current = null;
-                setPhoneSessionReady(false);
-                setPhoneConnected(false);
-                setSessionId(null);
-                setQrToken(null);
-                void startPhoneSession();
-              }}
-              className={
-                variant === "showcase"
-                  ? "flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-800/60 px-4 py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
-                  : "flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-95"
-              }
-            >
-              <RefreshCw size={13} />
-              Rigenera sessione
-            </button>
           </div>
         )}
 
