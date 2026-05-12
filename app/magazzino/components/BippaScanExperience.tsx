@@ -43,9 +43,8 @@ export type BippaScanExperienceProps = {
   /** Default: camera, phone, manual. Omitted tabs are hidden. */
   visibleTabs?: readonly BippaTab[];
   /**
-   * If true, ensures an auth session (via `signInAnonymously` when non è già loggato)
-   * prima di aprire il canale Realtime per il QR “telefono”. Serve per la home senza login.
-   * Richiede Anonymous sign-ins abilitato nel progetto Supabase.
+   * Home / anteprima: ottiene JWT per Realtime da `POST /api/bippa/demo-session` (firmato con SUPABASE_JWT_SECRET),
+   * senza login né Anonymous sign-ins su Supabase.
    */
   bootstrapAnonymousForRemoteScan?: boolean;
   /** Top row (e.g. dialog title + close). Omit for embedded landing demos. */
@@ -142,11 +141,7 @@ export function BippaScanExperience({
   const [phoneSessionReady, setPhoneSessionReady] = useState(false);
   const phoneChannelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
 
-  const [anonAuthStatus, setAnonAuthStatus] = useState<"pending" | "ready" | "error">(
-    () => (bootstrapAnonymousForRemoteScan ? "pending" : "ready"),
-  );
-  const [anonAuthMessage, setAnonAuthMessage] = useState<string | null>(null);
-  const [anonBootNonce, setAnonBootNonce] = useState(0);
+  const [demoSessionError, setDemoSessionError] = useState<string | null>(null);
 
   const [manualCode, setManualCode] = useState("");
   const manualInputRef = useRef<HTMLInputElement>(null);
@@ -168,47 +163,6 @@ export function BippaScanExperience({
   }, [resolvedTabs, activeTab]);
 
   useEffect(() => {
-    if (!bootstrapAnonymousForRemoteScan || !active) return;
-
-    let cancelled = false;
-    setAnonAuthStatus("pending");
-    setAnonAuthMessage(null);
-
-    (async () => {
-      const supabase = getSupabaseAuthClient();
-      if (!supabase) {
-        if (!cancelled) {
-          setAnonAuthStatus("error");
-          setAnonAuthMessage("Supabase non configurato.");
-        }
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (cancelled) return;
-      if (session?.access_token) {
-        setAnonAuthStatus("ready");
-        return;
-      }
-
-      const { error } = await supabase.auth.signInAnonymously();
-      if (cancelled) return;
-      if (error) {
-        setAnonAuthStatus("error");
-        setAnonAuthMessage(error.message);
-      } else {
-        setAnonAuthStatus("ready");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [active, bootstrapAnonymousForRemoteScan, anonBootNonce]);
-
-  useEffect(() => {
     if (active && !prevActiveRef.current) {
       setManualCode("");
       setLastCode(null);
@@ -219,6 +173,7 @@ export function BippaScanExperience({
       setPhoneSessionReady(false);
       setSessionId(null);
       setQrToken(null);
+      setDemoSessionError(null);
       const tab = resolvedTabs.includes(initialTab) ? initialTab : (resolvedTabs[0] ?? "phone");
       setActiveTab(tab);
     }
@@ -307,21 +262,53 @@ export function BippaScanExperience({
   };
 
   const startPhoneSession = useCallback(async () => {
-    const supabase = getSupabaseAuthClient();
-    if (!supabase) return;
-
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    if (!token) return;
-
-    const sid = crypto.randomUUID();
-    setSessionId(sid);
-    setQrToken(token);
-    setPhoneConnected(false);
-
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) return;
+
+    phoneChannelRef.current?.unsubscribe();
+    phoneChannelRef.current = null;
+    setPhoneSessionReady(false);
+    setPhoneConnected(false);
+
+    let sid: string;
+    let token: string;
+
+    if (bootstrapAnonymousForRemoteScan) {
+      setDemoSessionError(null);
+      try {
+        const res = await fetch("/api/bippa/demo-session", { method: "POST" });
+        const body = (await res.json().catch(() => ({}))) as {
+          sessionId?: string;
+          token?: string;
+          error?: string;
+        };
+        if (!res.ok) {
+          setDemoSessionError(body.error ?? `Errore server (${res.status}).`);
+          return;
+        }
+        if (!body.sessionId || !body.token) {
+          setDemoSessionError("Risposta demo-session non valida.");
+          return;
+        }
+        sid = body.sessionId;
+        token = body.token;
+      } catch (e) {
+        setDemoSessionError(e instanceof Error ? e.message : "Rete non disponibile.");
+        return;
+      }
+    } else {
+      const supabase = getSupabaseAuthClient();
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      const t = data?.session?.access_token;
+      if (!t) return;
+      token = t;
+      sid = crypto.randomUUID();
+    }
+
+    setSessionId(sid);
+    setQrToken(token);
 
     const supabase2 = createBrowserClient(url, key);
     supabase2.realtime.setAuth(token);
@@ -341,14 +328,13 @@ export function BippaScanExperience({
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") setPhoneSessionReady(true);
     });
-  }, [handleCode]);
+  }, [handleCode, bootstrapAnonymousForRemoteScan]);
 
   useEffect(() => {
     if (activeTab !== "phone" || !active) return;
-    if (bootstrapAnonymousForRemoteScan && anonAuthStatus !== "ready") return;
-    if (anonAuthStatus === "error") return;
+    if (bootstrapAnonymousForRemoteScan && demoSessionError) return;
     if (!phoneSessionReady) {
-      startPhoneSession();
+      void startPhoneSession();
     }
   }, [
     activeTab,
@@ -356,7 +342,7 @@ export function BippaScanExperience({
     phoneSessionReady,
     startPhoneSession,
     bootstrapAnonymousForRemoteScan,
-    anonAuthStatus,
+    demoSessionError,
   ]);
 
   const qrUrl =
@@ -395,7 +381,7 @@ export function BippaScanExperience({
   const shellClass =
     variant === "showcase"
       ? "flex w-full flex-col"
-      : `flex w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl ${showProductPanel ? "max-w-4xl" : "max-w-sm"}`;
+      : `mx-auto flex w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl ${showProductPanel ? "max-w-4xl" : "max-w-sm"}`;
 
   const successBanner =
     variant === "showcase"
@@ -525,8 +511,8 @@ export function BippaScanExperience({
             <p className={`text-xs leading-relaxed ${bodyText}`}>
               {bootstrapAnonymousForRemoteScan ? (
                 <>
-                  Scansiona questo QR con il telefono: si apre lo scanner remoto collegato a questa anteprima. Se non sei
-                  connesso, usiamo una sessione temporanea sul browser solo per questo collegamento.
+                  Scansiona questo QR con il telefono: si apre lo scanner remoto collegato a questa anteprima. Il
+                  collegamento usa un token temporaneo generato dal sito — senza effettuare l&apos;accesso.
                 </>
               ) : (
                 <>
@@ -536,7 +522,7 @@ export function BippaScanExperience({
               )}
             </p>
 
-            {anonAuthStatus === "error" && (
+            {demoSessionError && (
               <div
                 className={
                   variant === "showcase"
@@ -544,11 +530,20 @@ export function BippaScanExperience({
                     : "rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800"
                 }
               >
-                <p className="font-medium">Accesso anonimo non disponibile</p>
-                <p className="mt-1 leading-relaxed opacity-90">{anonAuthMessage}</p>
+                <p className="font-medium">Collegamento non disponibile</p>
+                <p className="mt-1 leading-relaxed opacity-90">{demoSessionError}</p>
                 <button
                   type="button"
-                  onClick={() => setAnonBootNonce((n) => n + 1)}
+                  onClick={() => {
+                    setDemoSessionError(null);
+                    phoneChannelRef.current?.unsubscribe();
+                    phoneChannelRef.current = null;
+                    setPhoneSessionReady(false);
+                    setPhoneConnected(false);
+                    setSessionId(null);
+                    setQrToken(null);
+                    void startPhoneSession();
+                  }}
                   className={
                     variant === "showcase"
                       ? "mt-2 text-xs font-semibold text-red-100 underline-offset-2 hover:underline"
@@ -568,18 +563,13 @@ export function BippaScanExperience({
                     : "relative flex h-52 w-52 items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
                 }
               >
-                {anonAuthStatus !== "error" &&
-                (anonAuthStatus === "pending" || !phoneSessionReady) ? (
+                {!demoSessionError && !phoneSessionReady ? (
                   <div className={`flex flex-col items-center gap-2 ${variant === "showcase" ? "text-zinc-500" : "text-slate-400"}`}>
                     <Loader2 size={24} className="animate-spin" />
-                    <p className="text-xs">
-                      {bootstrapAnonymousForRemoteScan && anonAuthStatus === "pending"
-                        ? "Preparazione accesso…"
-                        : "Generazione sessione…"}
-                    </p>
+                    <p className="text-xs">Generazione sessione…</p>
                   </div>
                 ) : null}
-                {anonAuthStatus === "ready" && phoneSessionReady && qrUrl && <QRCode value={qrUrl} size={180} />}
+                {!demoSessionError && phoneSessionReady && qrUrl && <QRCode value={qrUrl} size={180} />}
               </div>
 
               <div
@@ -599,19 +589,19 @@ export function BippaScanExperience({
             <button
               type="button"
               onClick={() => {
+                setDemoSessionError(null);
                 phoneChannelRef.current?.unsubscribe();
                 phoneChannelRef.current = null;
                 setPhoneSessionReady(false);
                 setPhoneConnected(false);
                 setSessionId(null);
                 setQrToken(null);
-                startPhoneSession();
+                void startPhoneSession();
               }}
-              disabled={anonAuthStatus === "pending" || anonAuthStatus === "error"}
               className={
                 variant === "showcase"
-                  ? "flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-800/60 px-4 py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                  : "flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                  ? "flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-zinc-800/60 px-4 py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
+                  : "flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-95"
               }
             >
               <RefreshCw size={13} />
