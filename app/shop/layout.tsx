@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shop fornitori – Visitae",
+  title: "Shop – Visitae",
   description:
     "Ordina prodotti dai fornitori per la tua struttura: consumabili, strumentario e materiali medici.",
 };

@@ -35,7 +35,7 @@ export function MenuWorkspaceShell({ children, headerCenter, headerLeft, headerR
         </div>
 
         <div className="flex min-h-0 flex-1 gap-0">
-          <DocIconNavRail open={docIconNavOpen} docId="123" onNavigate={() => setDocIconNavOpen(false)} />
+          <DocIconNavRail open={docIconNavOpen} onNavigate={() => setDocIconNavOpen(false)} />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
         </div>
       </div>

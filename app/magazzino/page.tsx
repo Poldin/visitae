@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -126,6 +127,76 @@ function fmtMovementType(value: string | null): string {
   if (value === "adjustment") return "Rettifica";
   if (value === "expired") return "Scaduto";
   return value;
+}
+
+const MAGAZZINO_TABLE_SKELETON_ROWS = 8;
+
+function MagazzinoProductsTableSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: MAGAZZINO_TABLE_SKELETON_ROWS }, (_, i) => (
+        <tr key={`prod-sk-${i}`} className="animate-pulse">
+          <td className="px-3 py-2">
+            <div className="h-8 w-8 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-4 max-w-56 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-28 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-24 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-4 w-10 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-32 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="ml-auto flex justify-end gap-1">
+              <div className="h-7 w-8 rounded-md bg-slate-200/80" />
+              <div className="h-7 w-8 rounded-md bg-slate-200/80" />
+              <div className="h-7 w-8 rounded-md bg-slate-200/80" />
+            </div>
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function MagazzinoMovementsTableSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: MAGAZZINO_TABLE_SKELETON_ROWS }, (_, i) => (
+        <tr key={`mov-sk-${i}`} className="animate-pulse">
+          <td className="px-3 py-2">
+            <div className="h-3 w-36 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-20 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-24 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 max-w-48 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-28 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-8 rounded bg-slate-200/80" />
+          </td>
+          <td className="px-3 py-2">
+            <div className="h-3 w-full max-w-xs rounded bg-slate-200/80" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
 }
 
 const NEAR_EXPIRY_DAYS = 10;
@@ -833,6 +904,7 @@ export default function MagazzinoPage() {
 
   const filteredProducts = products;
 
+  const showInitialSkeleton = !hasLoadedOnce && isRefreshing;
 
   return (
     <>
@@ -877,17 +949,18 @@ export default function MagazzinoPage() {
         <Link
           href="/shop"
           className="shop-button inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-extrabold tracking-[0.12em] text-white shadow-sm ring-1 ring-fuchsia-300/60"
-          title="Shop fornitori"
+          title="Shop"
         >
           <ShoppingBag size={14} aria-hidden />
           SHOP
         </Link>
       }
     >
-            {!hasLoadedOnce && isRefreshing ? (
-              <div className="p-4 text-sm text-slate-600">Caricamento dati...</div>
-            ) : section === "prodotti" ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+            {section === "prodotti" ? (
+              <div
+                className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden"
+                aria-busy={showInitialSkeleton}
+              >
                 {error ? <div className="px-4 pt-3 text-sm text-red-600">{error}</div> : null}
                 <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 px-2 pb-2 pt-1 sm:gap-3 sm:px-4 sm:pb-3 sm:pt-3">
                   <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -963,7 +1036,10 @@ export default function MagazzinoPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredProducts.map((p) => {
+                      {showInitialSkeleton ? (
+                        <MagazzinoProductsTableSkeletonRows />
+                      ) : (
+                        filteredProducts.map((p) => {
                         const expanded = expandAllProducts || expandedProductId === p.id;
                         const prossimaScadenza = getProssimaScadenzaCell(p);
                         return (
@@ -993,11 +1069,13 @@ export default function MagazzinoPage() {
                                       className="inline-flex rounded"
                                       title="Apri immagine"
                                     >
-                                      <img
+                                      <Image
                                         src={p.imageUrl}
                                         alt={p.name}
+                                        width={32}
+                                        height={32}
                                         className="h-8 w-8 rounded object-cover"
-                                        loading="lazy"
+                                        sizes="32px"
                                       />
                                     </button>
                                   ) : (
@@ -1012,11 +1090,13 @@ export default function MagazzinoPage() {
                               <td className="px-3 py-2">
                                 <span className="inline-flex items-center gap-2">
                                   {p.brandImageUrl ? (
-                                    <img
+                                    <Image
                                       src={p.brandImageUrl}
                                       alt={p.brand ?? "Brand"}
+                                      width={20}
+                                      height={20}
                                       className="h-5 w-5 rounded-sm border border-slate-200 object-cover"
-                                      loading="lazy"
+                                      sizes="20px"
                                     />
                                   ) : null}
                                   <span>{p.brand ?? "—"}</span>
@@ -1266,10 +1346,11 @@ export default function MagazzinoPage() {
                             </tr>
                           </Fragment>
                         );
-                      })}
+                      })
+                      )}
                     </tbody>
                   </table>
-                  {productsHasMore ? (
+                  {!showInitialSkeleton && productsHasMore ? (
                     <div className="flex justify-center py-3">
                       <button
                         type="button"
@@ -1284,7 +1365,10 @@ export default function MagazzinoPage() {
                 </div>
               </div>
             ) : section === "movimenti" ? (
-              <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+              <div
+                className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
+                aria-busy={showInitialSkeleton}
+              >
                 {error ? <div className="pb-3 text-sm text-red-600">{error}</div> : null}
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
@@ -1299,7 +1383,10 @@ export default function MagazzinoPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {movements.map((m) => {
+                    {showInitialSkeleton ? (
+                      <MagazzinoMovementsTableSkeletonRows />
+                    ) : (
+                      movements.map((m) => {
                       return (
                         <tr key={m.id} className="group transition-colors hover:bg-slate-800 hover:text-slate-100">
                           <td className="px-3 py-2">{fmtDateTime(m.createdAt)}</td>
@@ -1309,11 +1396,13 @@ export default function MagazzinoPage() {
                           <td className="px-3 py-2">
                             <span className="inline-flex items-center gap-2">
                               {m.brandImageUrl ? (
-                                <img
+                                <Image
                                   src={m.brandImageUrl}
                                   alt={m.brand ?? "Brand"}
+                                  width={20}
+                                  height={20}
                                   className="h-5 w-5 rounded-sm border border-slate-200 object-cover"
-                                  loading="lazy"
+                                  sizes="20px"
                                 />
                               ) : null}
                               <span>{m.brand ?? "—"}</span>
@@ -1323,10 +1412,11 @@ export default function MagazzinoPage() {
                           <td className="px-3 py-2 text-xs text-slate-600 group-hover:text-slate-100">{m.notes ?? "—"}</td>
                         </tr>
                       );
-                    })}
+                    })
+                    )}
                   </tbody>
                 </table>
-                {movementsHasMore ? (
+                {!showInitialSkeleton && movementsHasMore ? (
                   <div className="flex justify-center py-3">
                     <button
                       type="button"
@@ -1347,6 +1437,7 @@ export default function MagazzinoPage() {
                   movements={movements}
                   fmtDate={fmtDate}
                   fmtMovementType={fmtMovementType}
+                  loading={showInitialSkeleton}
                 />
               </>
             )}
@@ -1405,11 +1496,16 @@ export default function MagazzinoPage() {
             >
               <X size={14} />
             </button>
-            <img
-              src={previewImage.url}
-              alt={previewImage.name}
-              className="max-h-[84vh] max-w-[84vw] object-contain"
-            />
+            <div className="relative h-[min(84vh,1080px)] w-[min(84vw,1440px)]">
+              <Image
+                src={previewImage.url}
+                alt={previewImage.name}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 84vw, min(84vw, 1440px)"
+                priority
+              />
+            </div>
           </div>
         </div>
       ) : null}

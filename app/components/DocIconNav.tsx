@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Bell,
-  Code2,
   Menu,
   ShoppingBag,
   Settings,
-  Phone,
   Warehouse,
   X,
 } from "lucide-react";
@@ -100,24 +97,19 @@ export function DocIconNavMenuButton({
 
 export function DocIconNavRail({
   open,
-  docId,
   onNavigate,
 }: {
   open: boolean;
-  docId: string;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname() ?? "";
-  const safeDocId = docId || "123";
   const reduced = usePrefersReducedMotion();
   const ms = reduced ? 0 : RAIL_MS;
   const linkMs = reduced ? 0 : LINK_MS;
 
   const magazzinoActive = pathname === "/magazzino" || /\/doc\/[^/]+\/magazzino(?:\/|$)/.test(pathname);
   const shopActive = pathname === "/shop";
-  const notificheActive = pathname.includes("/notifiche");
   const impostazioniActive = pathname.includes("/impostazioni");
-  const devActive = /\/doc\/[^/]+\/dev(?:\/|$)/.test(pathname);
 
   const shellTransition = reduced ? "none" : `width ${ms}ms ${railEase}, border-color ${ms}ms ${railEase}`;
   const navTransition = reduced
@@ -176,41 +168,19 @@ export function DocIconNavRail({
           }`}
           style={docRailLinkMotionStyle(115, open, reduced, linkMs, railEase)}
           aria-current={shopActive ? "page" : undefined}
-          title="Shop fornitori"
-          aria-label="Shop fornitori"
+          title="Shop"
+          aria-label="Shop"
         >
           <ShoppingBag size={16} strokeWidth={2.1} aria-hidden />
         </Link>
         <div className="mt-1 flex w-full shrink-0 flex-col items-center gap-1.5 border-t border-slate-200 pt-1.5">
-          <Link
-            href={`/doc/${safeDocId}/notifiche`}
-            onClick={() => onNavigate?.()}
-            className={`${railBtnBase} ${notificheActive ? "border-blue-200 bg-blue-50 text-blue-700" : ""}`}
-            style={docRailLinkMotionStyle(430, open, reduced, linkMs, railEase)}
-            aria-current={notificheActive ? "page" : undefined}
-            title="Notifiche"
-            aria-label="Notifiche"
-          >
-            <Bell size={18} strokeWidth={2} aria-hidden />
-          </Link>
-          <Link
-            href={`/doc/${safeDocId}/dev`}
-            onClick={() => onNavigate?.()}
-            className={`${railBtnBase} ${devActive ? "border-blue-200 bg-blue-50 text-blue-700" : ""}`}
-            style={docRailLinkMotionStyle(465, open, reduced, linkMs, railEase)}
-            aria-current={devActive ? "page" : undefined}
-            title="Dev — API e documentazione"
-            aria-label="Dev, API e documentazione"
-          >
-            <Code2 size={18} strokeWidth={2} aria-hidden />
-          </Link>
           <a
             href={DISCORD_COMMUNITY_INVITE_URL}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => onNavigate?.()}
             className={railBtnBase}
-            style={docRailLinkMotionStyle(465, open, reduced, linkMs, railEase)}
+            style={docRailLinkMotionStyle(430, open, reduced, linkMs, railEase)}
             title="Discord — suggerimenti e community"
             aria-label="Apri Discord in una nuova scheda"
           >
@@ -231,7 +201,7 @@ export function DocIconNavRail({
                 ? "border-blue-200 bg-blue-100 text-blue-800 hover:border-slate-600! hover:bg-slate-800! hover:text-slate-100!"
                 : "border-slate-200 bg-linear-to-br from-slate-100 to-slate-200/90 text-slate-700 hover:border-slate-600! hover:from-slate-800! hover:to-slate-800! hover:text-slate-100!"
             }`}
-            style={docRailLinkMotionStyle(500, open, reduced, linkMs, railEase)}
+            style={docRailLinkMotionStyle(465, open, reduced, linkMs, railEase)}
             aria-current={impostazioniActive ? "page" : undefined}
             title="Profilo"
             aria-label="Profilo utente"

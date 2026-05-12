@@ -25,9 +25,16 @@ type StatisticsTabProps = {
   movements: StatisticsMovement[];
   fmtDate: (iso: string | null) => string;
   fmtMovementType: (value: string | null) => string;
+  loading?: boolean;
 };
 
-export function StatisticsTab({ products, movements, fmtDate, fmtMovementType }: StatisticsTabProps) {
+export function StatisticsTab({
+  products,
+  movements,
+  fmtDate,
+  fmtMovementType,
+  loading = false,
+}: StatisticsTabProps) {
   const kpi = useMemo(() => {
     const totalProducts = products.length;
     const totalQty = products.reduce((s, p) => s + p.totalQty, 0);
@@ -123,6 +130,49 @@ export function StatisticsTab({ products, movements, fmtDate, fmtMovementType }:
       dormantProductsCount,
     };
   }, [products, movements, fmtMovementType]);
+
+  if (loading) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4" aria-busy>
+        <div className="flex w-full flex-col gap-3">
+          <div className="mb-1">
+            <div className="h-7 w-48 max-w-full animate-pulse rounded-full bg-slate-200/80" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+              >
+                <div className="h-3 w-20 rounded bg-slate-200/80" />
+                <div className="mt-2 h-8 w-14 rounded bg-slate-200/80" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {Array.from({ length: 2 }, (_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+              >
+                <div className="mb-3 h-5 w-44 max-w-full rounded bg-slate-200/80" />
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <div className="h-7 w-28 rounded-full bg-slate-200/80" />
+                  <div className="h-7 w-24 rounded-full bg-slate-200/80" />
+                  <div className="h-7 w-32 rounded-full bg-slate-200/80" />
+                </div>
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }, (_, j) => (
+                    <div key={j} className="h-10 rounded-md bg-slate-100/90" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
