@@ -66,8 +66,8 @@ export default function BippaDemoPage() {
   const isScanning = scanState === "scanning" || scanState === "success";
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-white">
-      <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-3">
+    <div className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-slate-950 pb-[env(safe-area-inset-bottom)] text-white">
+      <div className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white">
           <ScanBarcode size={20} strokeWidth={2} />
         </span>
@@ -77,7 +77,7 @@ export default function BippaDemoPage() {
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-hidden bg-black">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
         <video
           ref={videoRef}
           className={`h-full w-full object-cover transition-opacity duration-300 ${isScanning ? "opacity-100" : "opacity-0"}`}
@@ -141,7 +141,7 @@ export default function BippaDemoPage() {
         )}
       </div>
 
-      <div className="border-t border-slate-800 bg-slate-950 px-4 py-4">
+      <div className="shrink-0 border-t border-slate-800 bg-slate-950 px-4 pb-4 pt-4">
         {!isScanning ? (
           <button
             type="button"
