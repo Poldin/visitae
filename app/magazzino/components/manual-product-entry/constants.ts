@@ -53,5 +53,6 @@ export const ENTRY_MODE_OPTIONS: EntryModeOption[] = [
 /** Solo Carico / Scarico / Inventario: interscambiabili. «Nuovo articolo» è una modalità fissa a parte. */
 export const STOCK_TRIO_MODE_OPTIONS = ENTRY_MODE_OPTIONS.filter((o) => o.id !== "nuovo");
 
+/** Allineato ai `rowBtn` in `/magazzino` (h-7, testo compatto). */
 export const modeTriggerBase =
-  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-300 hover:bg-slate-50";
+  "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50";

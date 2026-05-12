@@ -15,7 +15,7 @@ import type {
   ManualProductCatalogPrefill,
   ManualProductEntryHeaderMode,
 } from "./manual-product-entry/types";
-import { Loader2, Package, SearchX } from "lucide-react";
+import { Loader2, Package, SearchX, X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +77,7 @@ export function BippaScanProductPanel({
   const [confirmedManualLotId, setConfirmedManualLotId] = useState<string | null>(null);
   const [manualCreatedProductId, setManualCreatedProductId] = useState<string | null>(null);
   const [uploadedManualImageUrl, setUploadedManualImageUrl] = useState<string | null>(null);
+  const [notFoundBannerDismissed, setNotFoundBannerDismissed] = useState(false);
 
   // New-product form state
   const [manualName, setManualName] = useState("");
@@ -107,6 +108,7 @@ export function BippaScanProductPanel({
     if (!clinicId || !scannedCode) return;
 
     setLookup({ state: "loading" });
+    setNotFoundBannerDismissed(false);
     setSubmitError(null);
     setManualCreatedProductId(null);
     setExistingInventoryLots([]);
@@ -786,6 +788,7 @@ export function BippaScanProductPanel({
         headerProductName={headerProductName}
         onClose={onReset}
         onTitleModeChange={setHeaderMode}
+        dismissAppearance="collapse"
       />
 
       {/* Error */}
@@ -832,15 +835,24 @@ export function BippaScanProductPanel({
         )}
 
         {/* ── New product: not found info banner ── */}
-        {lookup.state === "new" && !lookup.prefill && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <SearchX size={16} className="mt-0.5 shrink-0 text-amber-500" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800">Codice non trovato</p>
-              <p className="text-xs text-amber-700">
-                Nessun prodotto con questo codice. Completa i dati per creare un nuovo articolo.
-              </p>
-              <p className="mt-1 font-mono text-xs text-amber-600">{scannedCode}</p>
+        {lookup.state === "new" && !lookup.prefill && !notFoundBannerDismissed && (
+          <div className="relative mb-4 rounded-xl border border-amber-200 bg-amber-50">
+            <button
+              type="button"
+              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-900"
+              aria-label="Nascondi avviso"
+              onClick={() => setNotFoundBannerDismissed(true)}
+            >
+              <X size={14} strokeWidth={2} aria-hidden />
+            </button>
+            <div className="flex items-start gap-2.5 px-3 py-2.5 pr-11">
+              <SearchX size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-amber-800">Codice non trovato</p>
+                <p className="text-xs text-amber-700">
+                  Completa i dati per creare un nuovo articolo.
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, ChevronsUp, X } from "lucide-react";
 import type { RefObject } from "react";
 import { ENTRY_MODE_OPTIONS, modeTriggerBase, STOCK_TRIO_MODE_OPTIONS } from "./constants";
 import type { ManualProductEntryHeaderMode } from "./types";
@@ -15,6 +15,11 @@ type ManualProductEntryHeaderProps = {
   headerProductName: string;
   onClose: () => void;
   onTitleModeChange?: (mode: ManualProductEntryHeaderMode) => void;
+  /**
+   * `close`: pulsante testuale "Chiudi" (dialog standalone).
+   * `collapse`: solo icona — comprime il riepilogo prodotto e torna alla scansione (es. Bippa nel dialog).
+   */
+  dismissAppearance?: "close" | "collapse";
 };
 
 export function ManualProductEntryHeader({
@@ -27,18 +32,14 @@ export function ManualProductEntryHeader({
   headerProductName,
   onClose,
   onTitleModeChange,
+  dismissAppearance = "close",
 }: ManualProductEntryHeaderProps) {
   const activeModeOption = ENTRY_MODE_OPTIONS.find((o) => o.id === headerMode) ?? ENTRY_MODE_OPTIONS[0];
   const ActiveModeIcon = activeModeOption.Icon;
 
   return (
     <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
-      <div
-        id="manual-product-entry-title"
-        className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3"
-        role="heading"
-        aria-level={2}
-      >
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-2.5">
         <div ref={modeDropdownRef} className="relative shrink-0">
           <button
             type="button"
@@ -58,11 +59,11 @@ export function ManualProductEntryHeader({
               setModeDropdownOpen((v) => !v);
             }}
           >
-            <ActiveModeIcon size={16} className={`shrink-0 ${activeModeOption.iconClass}`} />
+            <ActiveModeIcon size={14} className={`shrink-0 ${activeModeOption.iconClass}`} />
             <span>{activeModeOption.label}</span>
             {modeSwitcherLocked ? null : (
               <ChevronDown
-                size={14}
+                size={12}
                 className={`shrink-0 text-slate-500 transition-transform ${modeDropdownOpen ? "rotate-180" : ""}`}
                 aria-hidden
               />
@@ -83,7 +84,7 @@ export function ManualProductEntryHeader({
                     type="button"
                     role="option"
                     aria-selected={selected}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                    className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors ${
                       selected ? "bg-slate-50 text-slate-900" : "text-slate-700 hover:bg-slate-50"
                     }`}
                     onClick={() => {
@@ -92,7 +93,7 @@ export function ManualProductEntryHeader({
                       onTitleModeChange?.(opt.id);
                     }}
                   >
-                    <OptIcon size={16} className={`shrink-0 ${opt.iconClass}`} />
+                    <OptIcon size={14} className={`shrink-0 ${opt.iconClass}`} />
                     <span>{opt.label}</span>
                   </button>
                 );
@@ -100,20 +101,39 @@ export function ManualProductEntryHeader({
             </div>
           ) : null}
         </div>
-        {headerProductName ? (
-          <span className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 sm:text-xl">
-            {headerProductName}
-          </span>
-        ) : null}
+        <div
+          id="manual-product-entry-title"
+          role="heading"
+          aria-level={2}
+          className={
+            headerProductName
+              ? "min-w-0 flex-1 truncate text-base font-semibold leading-snug text-slate-900 sm:text-lg"
+              : "sr-only"
+          }
+        >
+          {headerProductName || "Inserimento prodotto"}
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-      >
-        <X size={14} />
-        Chiudi
-      </button>
+      {dismissAppearance === "collapse" ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          title="Torna alla scansione"
+          aria-label="Torna alla scansione"
+        >
+          <ChevronsUp size={15} strokeWidth={2} aria-hidden />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <X size={12} aria-hidden />
+          Chiudi
+        </button>
+      )}
     </div>
   );
 }

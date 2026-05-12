@@ -431,10 +431,11 @@ export function StockOperationDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+            title="Chiudi"
+            aria-label="Chiudi"
           >
-            <X size={14} />
-            Chiudi
+            <X size={14} strokeWidth={2} aria-hidden />
           </button>
         </div>
 
