@@ -16,7 +16,7 @@ type ManualProductEntryHeaderProps = {
   onClose: () => void;
   onTitleModeChange?: (mode: ManualProductEntryHeaderMode) => void;
   /**
-   * `close`: pulsante testuale "Chiudi" (dialog standalone).
+   * `close`: pulsante icona chiusura (dialog standalone).
    * `collapse`: solo icona — comprime il riepilogo prodotto e torna alla scansione (es. Bippa nel dialog).
    */
   dismissAppearance?: "close" | "collapse";
@@ -128,10 +128,11 @@ export function ManualProductEntryHeader({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          title="Chiudi"
+          aria-label="Chiudi"
         >
-          <X size={12} aria-hidden />
-          Chiudi
+          <X size={15} strokeWidth={2} aria-hidden />
         </button>
       )}
     </div>

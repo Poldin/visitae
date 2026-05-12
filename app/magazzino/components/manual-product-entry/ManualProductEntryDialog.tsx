@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT, intentToHeaderMode } from "./constants";
-import { inventoryUnitPriceFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
+import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
 import { ManualProductEntryHeader } from "./ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./ManualProductLotsSection";
@@ -174,7 +174,7 @@ export function ManualProductEntryDialog({
       const productIdForRefresh = existingProductIdVal;
       const { data, error } = await supabase
         .from("inventory_items")
-        .select("id,quantity,expiry_date,batch_number,price,location")
+        .select("id,quantity,expiry_date,batch_number,price,location,VAT")
         .eq("clinic_id", clinicId)
         .eq("product_id", productIdForRefresh)
         .gt("quantity", 0)
@@ -191,6 +191,7 @@ export function ManualProductEntryDialog({
           batch_number: string | null;
           price: unknown;
           location: string | null;
+          VAT: unknown;
         };
         return {
           inventoryItemId: String(row.id),
@@ -199,6 +200,7 @@ export function ManualProductEntryDialog({
           lotCode: row.batch_number ?? null,
           location: row.location ?? null,
           unitPrice: inventoryUnitPriceFromDb(row.price),
+          vatPct: inventoryVatFromDb(row.VAT),
         };
       });
       setExistingInventoryLots(lots);

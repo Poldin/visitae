@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -29,7 +30,7 @@ import {
 } from "./components/ManualProductEntryDialog";
 import { ManualProductLotsSection } from "./components/manual-product-entry/ManualProductLotsSection";
 import type { ExistingInventoryLot, ManualLotRow } from "./components/manual-product-entry/types";
-import { parseLotPriceUi, parseLotVatUi } from "./components/manual-product-entry/format";
+import { parseLotPriceUi, parseLotVatUi, inventoryVatFromDb } from "./components/manual-product-entry/format";
 import { BippaScanDialog } from "./components/BippaScanDialog";
 import { DdtImportDialog } from "./components/DdtImportDialog";
 import { StockOperationDialog, type StockOperationMode } from "./components/StockOperationDialog";
@@ -62,6 +63,7 @@ type ProductRow = {
     quantity: number;
     lotCode: string | null;
     price: number | null;
+    vatPct: number | null;
     location: string | null;
   }>;
 };
@@ -75,6 +77,7 @@ function productLotsToExistingInventoryLots(lots: ProductRow["lots"]): ExistingI
     location: lot.location ?? null,
     unitPrice:
       lot.price != null && Number.isFinite(lot.price) && lot.price > 0 ? lot.price : null,
+    vatPct: inventoryVatFromDb(lot.vatPct),
   }));
 }
 
@@ -264,6 +267,42 @@ function getProssimaScadenzaCell(p: ProductRow):
 
 const rowBtn =
   "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50";
+
+/** Toolbar sopra tabella: icona + scorciatoia sempre visibili; label solo hover/focus. */
+const magazzinoToolbarActionBtn =
+  "group inline-flex h-7 shrink-0 items-center gap-1 overflow-hidden rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 transition-[border-color,background-color,padding] duration-200 hover:border-slate-300 hover:bg-slate-50 hover:px-2 focus-visible:border-slate-300 focus-visible:bg-slate-50 focus-visible:px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40";
+
+function MagazzinoToolbarActionButton(props: {
+  title: string;
+  label: string;
+  shortcut: string;
+  onClick: () => void;
+  icon: LucideIcon;
+  iconClassName?: string;
+}) {
+  const { title, label, shortcut, onClick, icon: Icon, iconClassName } = props;
+  const kbdCls =
+    "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700";
+  const labelRevealCls =
+    "inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-200 ease-out group-hover:max-w-[220px] group-hover:opacity-100 group-focus-visible:max-w-[220px] group-focus-visible:opacity-100";
+
+  return (
+    <button
+      type="button"
+      className={magazzinoToolbarActionBtn}
+      title={title}
+      aria-label={`${label} (${shortcut})`}
+      onClick={onClick}
+    >
+      <Icon size={14} className={`shrink-0 ${iconClassName ?? ""}`} aria-hidden />
+      <span className={kbdCls}>{shortcut}</span>
+      <span className={labelRevealCls}>
+        <span className="inline-block whitespace-nowrap pl-1">{label}</span>
+      </span>
+    </button>
+  );
+}
+
 const PRODUCTS_PAGE_SIZE = 100;
 
 function productRowToManualPrefill(p: ProductRow): ManualProductCatalogPrefill {
@@ -979,47 +1018,53 @@ export default function MagazzinoPage() {
                     </button>
                   </div>
                   <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                    <button type="button" className={rowBtn} title="Bippa (B)" onClick={handleBippa}>
-                      <ScanBarcode size={14} className="text-slate-700" aria-hidden /> Bippa
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        B
-                      </span>
-                    </button>
-                    <button type="button" className={rowBtn} title="DDT (D)" onClick={handleDdt}>
-                      <Truck size={14} className="text-amber-700" aria-hidden /> DDT
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        D
-                      </span>
-                    </button>
-                    <button type="button" className={rowBtn} title="Carico merce (R)" onClick={handleCarico}>
-                      <ArrowDownRight size={14} className="text-emerald-600" /> Carico
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        R
-                      </span>
-                    </button>
-                    <button type="button" className={rowBtn} title="Scarico merce (S)" onClick={handleScarico}>
-                      <ArrowUpRight size={14} className="text-rose-600" /> Scarico
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        S
-                      </span>
-                    </button>
-                    <button type="button" className={rowBtn} title="Inventario fisico (I)" onClick={handleInventario}>
-                      <ClipboardCheck size={14} className="text-slate-700" /> Inventario
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        I
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={rowBtn}
+                    <MagazzinoToolbarActionButton
+                      title="Bippa (B)"
+                      label="Bippa"
+                      shortcut="B"
+                      onClick={handleBippa}
+                      icon={ScanBarcode}
+                      iconClassName="text-slate-700"
+                    />
+                    <MagazzinoToolbarActionButton
+                      title="DDT (D)"
+                      label="DDT"
+                      shortcut="D"
+                      onClick={handleDdt}
+                      icon={Truck}
+                      iconClassName="text-amber-700"
+                    />
+                    <MagazzinoToolbarActionButton
+                      title="Carico merce (R)"
+                      label="Carico"
+                      shortcut="R"
+                      onClick={handleCarico}
+                      icon={ArrowDownRight}
+                      iconClassName="text-emerald-600"
+                    />
+                    <MagazzinoToolbarActionButton
+                      title="Scarico merce (S)"
+                      label="Scarico"
+                      shortcut="S"
+                      onClick={handleScarico}
+                      icon={ArrowUpRight}
+                      iconClassName="text-rose-600"
+                    />
+                    <MagazzinoToolbarActionButton
+                      title="Inventario fisico (I)"
+                      label="Inventario"
+                      shortcut="I"
+                      onClick={handleInventario}
+                      icon={ClipboardCheck}
+                      iconClassName="text-slate-700"
+                    />
+                    <MagazzinoToolbarActionButton
                       title="Nuovo articolo (N)"
+                      label="Nuovo articolo"
+                      shortcut="N"
                       onClick={handleNuovoArticolo}
-                    >
-                      <Plus size={14} /> Nuovo articolo
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-bold leading-none text-slate-700">
-                        N
-                      </span>
-                    </button>
+                      icon={Plus}
+                    />
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 sm:px-4">

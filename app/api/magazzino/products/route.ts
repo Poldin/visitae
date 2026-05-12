@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { inventoryVatFromDb } from "@/app/magazzino/components/manual-product-entry/format";
 import type { Database } from "@/lib/supabase.types";
 
 const MAX_PAGE_SIZE = 100;
@@ -64,6 +65,8 @@ type ProductRow = {
     quantity: number;
     lotCode: string | null;
     price: number | null;
+    /** `inventory_items.VAT` */
+    vatPct: number | null;
     location: string | null;
   }>;
 };
@@ -87,6 +90,7 @@ type InventoryDbRow = {
   last_updated: string | null;
   price: number | string | null;
   location: string | null;
+  VAT: number | null;
 };
 
 function inventoryPriceToNumberOrNull(raw: InventoryDbRow["price"]): number | null {
@@ -328,7 +332,7 @@ export async function GET(req: NextRequest) {
       supabase.from("brands").select("name,image_url"),
       supabase
         .from("inventory_items")
-        .select("id,product_id,quantity,expiry_date,batch_number,last_updated,price,location")
+        .select("id,product_id,quantity,expiry_date,batch_number,last_updated,price,location,VAT")
         .eq("clinic_id", clinicId)
         .gt("quantity", 0),
       supabase
@@ -394,6 +398,7 @@ export async function GET(req: NextRequest) {
         quantity: Number(lot.quantity ?? 0),
         lotCode: lot.batch_number ?? null,
         price: inventoryPriceToNumberOrNull(lot.price),
+        vatPct: inventoryVatFromDb(lot.VAT),
         location: lot.location ?? null,
       }))
       .sort((a, b) => {

@@ -52,8 +52,10 @@ export type ExistingInventoryLot = {
   lotCode: string | null;
   /** Memo posizione fisica in magazzino. */
   location: string | null;
-  /** Prezzo unitario da DB; assente o ≤ 0 non mostrato in UI. */
+  /** Prezzo unitario imponibile da DB; assente o ≤ 0 non mostrato in UI. */
   unitPrice: number | null;
+  /** Allineato a `inventory_items.VAT`; assente o 0 = nessuna aliquota in riepilogo. */
+  vatPct: number | null;
 };
 
 export type ManualProductEntryDialogProps = {

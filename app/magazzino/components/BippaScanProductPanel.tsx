@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT } from "./manual-product-entry/constants";
-import { inventoryUnitPriceFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
+import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
 import { ManualProductEntryHeader } from "./manual-product-entry/ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./manual-product-entry/ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./manual-product-entry/ManualProductLotsSection";
@@ -210,7 +210,7 @@ export function BippaScanProductPanel({
 
       const { data, error } = await supabase
         .from("inventory_items")
-        .select("id,quantity,expiry_date,batch_number,price,location")
+        .select("id,quantity,expiry_date,batch_number,price,location,VAT")
         .eq("clinic_id", clinicId)
         .eq("product_id", pid)
         .gt("quantity", 0)
@@ -228,6 +228,7 @@ export function BippaScanProductPanel({
           batch_number: string | null;
           price: unknown;
           location: string | null;
+          VAT: unknown;
         };
         return {
           inventoryItemId: String(row.id),
@@ -236,6 +237,7 @@ export function BippaScanProductPanel({
           lotCode: row.batch_number ?? null,
           location: row.location ?? null,
           unitPrice: inventoryUnitPriceFromDb(row.price),
+          vatPct: inventoryVatFromDb(row.VAT),
         };
       });
       setExistingInventoryLots(lots);

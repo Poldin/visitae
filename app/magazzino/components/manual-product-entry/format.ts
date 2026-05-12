@@ -33,6 +33,30 @@ export function lotLineGrossTotal(quantity: number, unitNetEur: number, vatPct: 
   return Math.round(quantity * unitNetEur * (1 + rate) * 100) / 100;
 }
 
+/**
+ * Prezzo unitario imponibile da totale riga IVA inclusa, quantità e aliquota.
+ * IVA null o 0 → totale riga = imponibile × qty.
+ */
+export function unitNetFromLineGross(
+  lineGrossEur: number,
+  quantity: number,
+  vatPct: number | null,
+): number | null {
+  if (!Number.isFinite(lineGrossEur) || lineGrossEur <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+  const rate = vatPct != null && vatPct > 0 ? vatPct / 100 : 0;
+  const denom = quantity * (1 + rate);
+  if (denom <= 0) return null;
+  return Math.round((lineGrossEur / denom) * 100) / 100;
+}
+
+/** Valore per input testo prezzo lotto (coerente con parseLotPriceUi). */
+export function fmtLotPriceInput(n: number): string {
+  if (!Number.isFinite(n)) return "";
+  return (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
+}
+
 export function fmtLotUnitPriceEur(value: number): string {
   return new Intl.NumberFormat("it-IT", {
     style: "currency",
@@ -54,4 +78,12 @@ export function inventoryUnitPriceFromDb(raw: unknown): number | null {
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n) || n <= 0) return null;
   return n;
+}
+
+/** Percentuale IVA da `inventory_items.VAT`. */
+export function inventoryVatFromDb(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return Math.round(n * 100) / 100;
 }

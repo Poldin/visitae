@@ -2,9 +2,18 @@
 
 import { Check, Plus, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { ExistingLotSummaryBar } from "./ExistingLotSummaryBar";
 import { InventoryLocationInput } from "./InventoryLocationInput";
-import { fmtLotUnitPriceEur, lotLineGrossTotal, parseLotPriceUi, parseLotVatUi, sanitizePriceInput } from "./format";
+import {
+  fmtLotPriceInput,
+  fmtLotUnitPriceEur,
+  lotLineGrossTotal,
+  parseLotPriceUi,
+  parseLotVatUi,
+  sanitizePriceInput,
+  unitNetFromLineGross,
+} from "./format";
 import type { ExistingInventoryLot, ManualLotRow, ManualProductEntryHeaderMode } from "./types";
 
 export type ManualProductLotRowProps = {
@@ -168,6 +177,44 @@ export function ManualProductLotRow({
       ? "w-[5.25rem] shrink-0 min-w-0"
       : "min-w-42 shrink-0";
 
+  const [lineTotalFocused, setLineTotalFocused] = useState(false);
+  const [lineTotalDraft, setLineTotalDraft] = useState("");
+
+  const loadQtyForLine = Number(lot.quantity);
+  const loadUnitParsed = parseLotPriceUi(lot.price);
+  const vatPctForLine = parseLotVatUi(lot.vat);
+  const qtyOkForLine = Number.isInteger(loadQtyForLine) && loadQtyForLine > 0;
+  const grossFromUnitPrice =
+    qtyOkForLine && loadUnitParsed != null && loadUnitParsed > 0
+      ? lotLineGrossTotal(loadQtyForLine, loadUnitParsed, vatPctForLine)
+      : null;
+
+  useEffect(() => {
+    if (!lineTotalFocused) return;
+    const d = lineTotalDraft;
+    if (d.trim() === "") {
+      if (lot.price !== "") onUpdateLotField(lot.id, { price: "" });
+      return;
+    }
+    const g = parseLotPriceUi(d);
+    const q = Number(lot.quantity);
+    const v = parseLotVatUi(lot.vat);
+    if (g == null || g <= 0 || !Number.isInteger(q) || q <= 0) return;
+    if (lot.vat.trim() !== "" && v === null) return;
+    const unit = unitNetFromLineGross(g, q, v);
+    if (unit == null || unit <= 0) return;
+    const next = fmtLotPriceInput(unit);
+    if (next !== lot.price) onUpdateLotField(lot.id, { price: next });
+  }, [
+    lineTotalFocused,
+    lineTotalDraft,
+    lot.quantity,
+    lot.vat,
+    lot.price,
+    lot.id,
+    onUpdateLotField,
+  ]);
+
   return (
     <div
       className={`flex flex-wrap gap-x-2 gap-y-1 ${isScaricoInventario ? "" : compact ? "items-center" : "items-end"}`}
@@ -294,20 +341,31 @@ export function ManualProductLotRow({
                   autoComplete="off"
                 />
               </div>
-              {(() => {
-                const loadQ = Number(lot.quantity);
-                const loadUnit = parseLotPriceUi(lot.price);
-                const vatPct = parseLotVatUi(lot.vat);
-                if (!Number.isInteger(loadQ) || loadQ <= 0 || loadUnit == null || loadUnit <= 0) return null;
-                const gross = lotLineGrossTotal(loadQ, loadUnit, vatPct);
-                const netTot = Math.round(loadQ * loadUnit * 100) / 100;
-                const vatEuro = Math.round(Math.max(0, gross - netTot) * 100) / 100;
+              {qtyOkForLine ? (() => {
+                const showBreakdown =
+                  loadUnitParsed != null && loadUnitParsed > 0 && grossFromUnitPrice != null;
+                const netTot =
+                  showBreakdown && loadUnitParsed != null
+                    ? Math.round(loadQtyForLine * loadUnitParsed * 100) / 100
+                    : 0;
+                const vatEuro =
+                  showBreakdown && grossFromUnitPrice != null
+                    ? Math.round(Math.max(0, grossFromUnitPrice - netTot) * 100) / 100
+                    : 0;
                 const textCls = compact ? "text-[11px]" : "text-sm";
-                const boxH = compact ? "h-7" : "h-9";
+                const boxH = compact ? "h-7 min-h-7" : "h-9 min-h-9";
                 const tip =
-                  vatPct != null && vatPct > 0
-                    ? `Imponibile ${fmtLotUnitPriceEur(netTot)} · IVA ${vatPct}% · Totale ${fmtLotUnitPriceEur(gross)}`
-                    : `Totale imponibile ${fmtLotUnitPriceEur(gross)}`;
+                  showBreakdown &&
+                  grossFromUnitPrice != null &&
+                  vatPctForLine != null &&
+                  vatPctForLine > 0
+                    ? `Imponibile ${fmtLotUnitPriceEur(netTot)} · IVA ${vatPctForLine}% · Totale ${fmtLotUnitPriceEur(grossFromUnitPrice)}`
+                    : showBreakdown && grossFromUnitPrice != null
+                      ? `Totale imponibile ${fmtLotUnitPriceEur(grossFromUnitPrice)}`
+                      : "Totale riga (IVA inclusa). Modificando qui si ricalcola l’imponibile unitario in base a quantità e IVA.";
+                const totalInputCls = compact
+                  ? "h-7 w-[4.75rem] min-w-[4.75rem] rounded-md border border-slate-200 px-1.5 text-[11px] font-semibold text-slate-700 tabular-nums"
+                  : "h-9 w-[6.25rem] min-w-[6.25rem] rounded-md border border-slate-200 px-2 text-sm font-semibold text-slate-700 tabular-nums";
                 return (
                   <div
                     className={`flex ${boxH} items-center gap-x-1.5 self-end ${textCls} text-slate-700`}
@@ -316,16 +374,45 @@ export function ManualProductLotRow({
                     <span className="select-none text-[10px] text-slate-400" aria-hidden>
                       •
                     </span>
-                    <span>
-                      tot.{" "}
-                      <span className="font-semibold tabular-nums">{fmtLotUnitPriceEur(gross)}</span>
+                    <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                      <span className="whitespace-nowrap">
+                        tot.{" "}
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Totale riga IVA inclusa"
+                          value={
+                            lineTotalFocused
+                              ? lineTotalDraft
+                              : grossFromUnitPrice != null
+                                ? fmtLotPriceInput(grossFromUnitPrice)
+                                : ""
+                          }
+                          onChange={(e) => setLineTotalDraft(sanitizePriceInput(e.target.value))}
+                          onFocus={() => {
+                            setLineTotalFocused(true);
+                            if (grossFromUnitPrice != null) {
+                              setLineTotalDraft(fmtLotPriceInput(grossFromUnitPrice));
+                            } else {
+                              setLineTotalDraft("");
+                            }
+                          }}
+                          onBlur={() => {
+                            setLineTotalFocused(false);
+                            setLineTotalDraft("");
+                          }}
+                          placeholder="totale"
+                          title="Totale riga (IVA inclusa). Modificando qui si ricalcola l’imponibile unitario."
+                          className={totalInputCls}
+                          autoComplete="off"
+                        />
+                      </span>
                       <span className="font-normal text-slate-500">
-                        {" "}
                         IVA incl.
-                        {vatPct != null && vatPct > 0 ? (
+                        {showBreakdown && vatPctForLine != null && vatPctForLine > 0 ? (
                           <span className="tabular-nums">
                             {" "}
-                            ({vatPct.toLocaleString("it-IT", {
+                            ({vatPctForLine.toLocaleString("it-IT", {
                               minimumFractionDigits: 0,
                               maximumFractionDigits: 2,
                             })}
@@ -336,7 +423,7 @@ export function ManualProductLotRow({
                     </span>
                   </div>
                 );
-              })()}
+              })() : null}
             </>
           ) : null}
           {confirmButton}
@@ -396,6 +483,24 @@ export function ManualProductLotsSection({
   const showExistingLoadBanner =
     isLoadMode && showExistingInventoryWhenLoad && existingInventoryLots.length > 0;
 
+  const existingLotsPosQty = existingInventoryLots.filter((i) => i.quantity > 0);
+  const showExistingMicroTotals = showExistingLoadBanner && existingLotsPosQty.length > 1;
+
+  let existingMicroTotalQty = 0;
+  let existingMicroImponibile = 0;
+  let existingMicroGross = 0;
+  for (const inv of existingLotsPosQty) {
+    existingMicroTotalQty += inv.quantity;
+    const u = inv.unitPrice;
+    if (u != null && u > 0) {
+      existingMicroImponibile += Math.round(inv.quantity * u * 100) / 100;
+      existingMicroGross += lotLineGrossTotal(inv.quantity, u, inv.vatPct);
+    }
+  }
+  const existingMicroHasPrice = existingLotsPosQty.some((i) => i.unitPrice != null && i.unitPrice > 0);
+  existingMicroImponibile = Math.round(existingMicroImponibile * 100) / 100;
+  existingMicroGross = Math.round(existingMicroGross * 100) / 100;
+
   const sectionOuterClass = compact
     ? "mt-0 max-w-none space-y-1.5"
     : showExistingLoadBanner
@@ -413,6 +518,37 @@ export function ManualProductLotsSection({
         <div className={compact ? "mt-3 mb-2 space-y-1" : "mt-10 mb-6 max-w-3xl space-y-3"}>
           {!compact ? (
             <p className="text-xs font-semibold tracking-wide text-slate-600">Giacenza attuale</p>
+          ) : null}
+          {showExistingMicroTotals ? (
+            <div
+              className={
+                compact ? "mb-0.5 flex flex-wrap items-center gap-1.5" : "mb-1 flex flex-wrap items-center gap-1.5"
+              }
+            >
+              <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+                <span className="font-medium text-slate-400">Giacenza</span>
+                <span>
+                  <span className="font-semibold text-slate-50">{existingMicroTotalQty}</span> pz
+                </span>
+              </span>
+              {existingMicroHasPrice ? (
+                <>
+                  <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+                    <span className="font-medium text-slate-400">Imponibile tot.</span>
+                    <span className="font-semibold text-slate-50">
+                      {fmtLotUnitPriceEur(existingMicroImponibile)}
+                    </span>
+                  </span>
+                  <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+                    <span className="font-medium text-slate-400">tot.</span>
+                    <span className="font-semibold text-slate-50">
+                      {fmtLotUnitPriceEur(existingMicroGross)}
+                    </span>
+                    <span className="text-slate-400">IVA incl.</span>
+                  </span>
+                </>
+              ) : null}
+            </div>
           ) : null}
           {existingInventoryLots.map((inv) => (
             <ExistingLotSummaryBar key={inv.inventoryItemId} inv={inv} />
