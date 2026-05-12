@@ -4,11 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
+import {
+  lookupBrandLogoByLabel,
+  resolveProductBrandLabel,
+} from "@/app/magazzino/lib/productBrandDisplay";
+import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
 import { BRAND_DROPDOWN_LIMIT } from "./manual-product-entry/constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
 import { ManualProductEntryHeader } from "./manual-product-entry/ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./manual-product-entry/ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./manual-product-entry/ManualProductLotsSection";
+import { ProductHeroImageColumn } from "./manual-product-entry/ProductHeroImageColumn";
 import type {
   BrandOption,
   ExistingInventoryLot,
@@ -44,6 +50,8 @@ export type BippaScanProductPanelProps = {
   onCreated: () => Promise<void> | void;
   /** Called when user wants to go back to scanner (e.g. "Nuova scansione"). */
   onReset: () => void;
+  /** Notifica URL immagine hero per allargare layout (es. BippaScanExperience). */
+  onProductHeroImageUrlChange?: (url: string | null) => void;
 };
 
 const makeDefaultLot = (): ManualLotRow => ({
@@ -64,6 +72,7 @@ export function BippaScanProductPanel({
   existingProductNames,
   onCreated,
   onReset,
+  onProductHeroImageUrlChange,
 }: BippaScanProductPanelProps) {
   const [lookup, setLookup] = useState<LookupResult>({ state: "loading" });
 
@@ -114,6 +123,9 @@ export function BippaScanProductPanel({
     setManualCreatedProductId(null);
     setExistingInventoryLots([]);
     setManualLots([makeDefaultLot()]);
+    setManualImageFile(null);
+    setUploadedManualImageUrl(null);
+    setManualDescription("");
 
     const run = async () => {
       const supabase = getSupabaseAuthClient();
@@ -122,19 +134,36 @@ export function BippaScanProductPanel({
       // 1. Search products table (clinic's own inventory)
       const { data: product } = await supabase
         .from("products")
-        .select("id, name, ean, sku, image_url, description, brand:brand_id(name, image_url)")
+        .select("id, name, ean, sku, image_url, description, metadata, category, brand:brand_id(name, image_url)")
         .eq("clinic_id", clinicId)
         .or(`ean.eq.${scannedCode},udi_di.eq.${scannedCode},hibc_primary.eq.${scannedCode}`)
         .maybeSingle();
 
       if (product) {
         const brand = product.brand as { name: string; image_url: string | null } | null;
+        const brandLabel = resolveProductBrandLabel({
+          metadata: product.metadata,
+          category: product.category as string | null | undefined,
+          joinedBrand: brand ?? undefined,
+        });
+        let brandImageUrlResolved = (brand?.image_url ?? null) as string | null;
+        if (!brandImageUrlResolved && brandLabel.trim()) {
+          brandImageUrlResolved = await lookupBrandLogoByLabel(supabase, brandLabel);
+        }
+
+        setManualName(product.name as string);
+        setBrandSearch(brandLabel);
+        setDebouncedBrandSearch(brandLabel.trim());
+        setManualSku((product.sku as string | null) ?? "");
+        setManualEan((product.ean as string | null) ?? scannedCode);
+        setCatalogImageUrl((product.image_url as string | null) ?? null);
+        setManualDescription(((product.description as string | null) ?? "").trim());
         setLookup({
           state: "found_product",
           productId: product.id as string,
           name: product.name as string,
-          brandName: (brand?.name ?? null) as string | null,
-          brandImageUrl: (brand?.image_url ?? null) as string | null,
+          brandName: brandLabel.trim() ? brandLabel.trim() : null,
+          brandImageUrl: brandImageUrlResolved,
           ean: product.ean as string | null,
           sku: product.sku as string | null,
           imageUrl: product.image_url as string | null,
@@ -279,53 +308,67 @@ export function BippaScanProductPanel({
     setManualLots([makeDefaultLot()]);
   }, [headerMode]);
 
-  // ── Brand dropdown debounce ─────────────────────────────────────────────────
+  // ── Brand dropdown (stessa UX di ManualProductEntryDialog) ────────────────
 
   useEffect(() => {
+    if (lookup.state === "loading") return;
     const timeout = window.setTimeout(() => setDebouncedBrandSearch(brandSearch.trim()), 250);
     return () => window.clearTimeout(timeout);
-  }, [brandSearch]);
+  }, [brandSearch, lookup.state]);
 
-  useEffect(() => {
-    if (!brandDropdownOpen) return;
-    const fetchBrands = async () => {
-      const supabase = getSupabaseAuthClient();
-      if (!supabase) return;
-      setBrandLoading(true);
-      let options: BrandOption[] = [];
-      if (debouncedBrandSearch) {
-        const { data } = await supabase
-          .from("brands")
-          .select("id,name,image_url")
-          .ilike("name", `%${debouncedBrandSearch}%`)
-          .order("name", { ascending: true })
-          .limit(BRAND_DROPDOWN_LIMIT);
-        options = (data ?? [])
-          .filter((item): item is { id: string; name: string; image_url: string | null } =>
-            Boolean(item?.id && item?.name),
-          )
-          .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
+  const fetchBrandOptions = useCallback(async (searchValue: string) => {
+    const supabase = getSupabaseAuthClient();
+    if (!supabase) {
+      setSubmitError("Configurazione Supabase mancante.");
+      return;
+    }
+    setBrandLoading(true);
+    setSubmitError(null);
+    let options: BrandOption[] = [];
+    if (searchValue) {
+      const { data, error } = await supabase
+        .from("brands")
+        .select("id,name,image_url")
+        .ilike("name", `%${searchValue}%`)
+        .order("name", { ascending: true })
+        .limit(BRAND_DROPDOWN_LIMIT);
+      if (error) {
+        setSubmitError(error.message);
       } else {
-        const { count } = await supabase.from("brands").select("id", { count: "exact", head: true });
+        options = (data ?? [])
+          .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
+          .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
+      }
+    } else {
+      const { count, error: countError } = await supabase.from("brands").select("id", { count: "exact", head: true });
+      if (countError) {
+        setSubmitError(countError.message);
+      } else {
         const safeCount = count ?? 0;
         const maxOffset = Math.max(0, safeCount - BRAND_DROPDOWN_LIMIT);
         const randomOffset = maxOffset > 0 ? Math.floor(Math.random() * (maxOffset + 1)) : 0;
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("brands")
           .select("id,name,image_url")
           .order("name", { ascending: true })
           .range(randomOffset, randomOffset + BRAND_DROPDOWN_LIMIT - 1);
-        options = (data ?? [])
-          .filter((item): item is { id: string; name: string; image_url: string | null } =>
-            Boolean(item?.id && item?.name),
-          )
-          .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
+        if (error) {
+          setSubmitError(error.message);
+        } else {
+          options = (data ?? [])
+            .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
+            .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
+        }
       }
-      setBrandOptions(options);
-      setBrandLoading(false);
-    };
-    void fetchBrands();
-  }, [brandDropdownOpen, debouncedBrandSearch]);
+    }
+    setBrandOptions(options);
+    setBrandLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (lookup.state === "loading" || !brandDropdownOpen) return;
+    void fetchBrandOptions(debouncedBrandSearch);
+  }, [lookup.state, brandDropdownOpen, debouncedBrandSearch, fetchBrandOptions]);
 
   useEffect(() => {
     if (!brandDropdownOpen) return;
@@ -373,12 +416,47 @@ export function BippaScanProductPanel({
 
   const selectedBrandImageUrl = useMemo(() => {
     if (exactBrandMatch?.image_url) return exactBrandMatch.image_url;
-    if (lookup.state === "found_product") return lookup.brandImageUrl;
-    if (catalogPrefill?.brand?.trim().toLowerCase() === normalizedBrandSearch.toLowerCase()) {
-      return catalogPrefill.brandImageUrl ?? null;
+    const pre =
+      lookup.state === "found_product"
+        ? { brand: lookup.brandName, brandImageUrl: lookup.brandImageUrl }
+        : catalogPrefill
+          ? { brand: catalogPrefill.brand, brandImageUrl: catalogPrefill.brandImageUrl }
+          : null;
+    const preBrand = pre?.brand?.trim().toLowerCase();
+    if (
+      pre &&
+      preBrand &&
+      preBrand === normalizedBrandSearch.toLowerCase() &&
+      pre.brandImageUrl
+    ) {
+      return pre.brandImageUrl;
     }
     return null;
   }, [exactBrandMatch, lookup, catalogPrefill, normalizedBrandSearch]);
+
+  const productHeroImageUrl = useMemo(() => {
+    if (lookup.state === "loading") return null;
+    if (manualImagePreviewUrl) return manualImagePreviewUrl;
+    const up = uploadedManualImageUrl?.trim();
+    if (up) return up;
+    const cat = catalogImageUrl?.trim();
+    if (cat) return cat;
+    if (lookup.state === "found_product") {
+      const iu = lookup.imageUrl?.trim();
+      if (iu) return iu;
+    }
+    return null;
+  }, [
+    lookup.state,
+    lookup,
+    manualImagePreviewUrl,
+    uploadedManualImageUrl,
+    catalogImageUrl,
+  ]);
+
+  useEffect(() => {
+    onProductHeroImageUrlChange?.(productHeroImageUrl);
+  }, [productHeroImageUrl, onProductHeroImageUrlChange]);
 
   const isLoadMode = headerMode === "carico" || headerMode === "nuovo";
   const isScaricoInventario = headerMode === "scarico" || headerMode === "inventario";
@@ -394,10 +472,61 @@ export function BippaScanProductPanel({
           : "Aggiungi";
 
   const headerProductName = useMemo(() => {
-    if (lookup.state === "found_product") return lookup.name;
+    if (lookup.state === "found_product") return manualName.trim() || lookup.name;
     if (lookup.state === "new") return manualName.trim() || catalogPrefill?.name || "";
     return "";
   }, [lookup, manualName, catalogPrefill]);
+
+  const autosaveProductId =
+    lookup.state === "found_product" ? lookup.productId : manualCreatedProductId;
+
+  const onCreatedRef = useRef(onCreated);
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated]);
+  const lastAutosaveEchoRef = useRef(0);
+
+  const onAutosaveImageUploaded = useCallback((publicUrl: string) => {
+    setUploadedManualImageUrl(publicUrl);
+    setCatalogImageUrl(publicUrl);
+    setManualImageFile(null);
+  }, []);
+
+  const onAutosavePersistError = useCallback((message: string) => {
+    setSubmitError(message);
+  }, []);
+
+  const onAutosaveEcho = useCallback(() => {
+    const now = Date.now();
+    if (now - lastAutosaveEchoRef.current < 2600) return;
+    lastAutosaveEchoRef.current = now;
+    void onCreatedRef.current?.();
+  }, []);
+
+  useProductIdentityAutosave({
+    enabled: Boolean(clinicId && autosaveProductId && lookup.state !== "loading"),
+    clinicId,
+    productId: autosaveProductId,
+    hydrationKey: `${scannedCode}|${autosaveProductId ?? ""}`,
+    manualName,
+    normalizedBrandSearch,
+    exactBrandMatch,
+    manualSku,
+    manualEan,
+    manualDescription,
+    uploadedManualImageUrl,
+    catalogImageUrl,
+    manualImageFile,
+    onImageUploaded: onAutosaveImageUploaded,
+    onPersistError: onAutosavePersistError,
+    onAutosaveApplied: onAutosaveEcho,
+  });
+
+  const handleUseTypedBrand = useCallback(() => {
+    if (!normalizedBrandSearch) return;
+    setBrandSearch(normalizedBrandSearch);
+    setBrandDropdownOpen(false);
+  }, [normalizedBrandSearch]);
 
   // ── API calls (same logic as ManualProductEntryDialog) ─────────────────────
 
@@ -693,7 +822,10 @@ export function BippaScanProductPanel({
 
       if (isLoad) {
         if (headerMode !== "nuovo") {
-          const productId = await ensureManualProduct();
+          const productId =
+            lookup.state === "found_product"
+              ? lookup.productId
+              : await ensureManualProduct();
           if (!productId) { setProcessingManualLotId(null); return; }
           const ok = await callCaricoApi(productId, lot);
           setProcessingManualLotId(null);
@@ -794,42 +926,8 @@ export function BippaScanProductPanel({
       ) : null}
 
       {/* Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-
-        {/* ── Existing product: read-only identity card ── */}
-        {lookup.state === "found_product" && (
-          <div className="mb-4 flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            {lookup.imageUrl ? (
-              <img
-                src={lookup.imageUrl}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 bg-white object-contain"
-              />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400">
-                <Package size={22} />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-slate-900 leading-snug">{lookup.name}</p>
-              {lookup.brandName && (
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  {lookup.brandImageUrl && (
-                    <img src={lookup.brandImageUrl} alt="" className="h-4 w-4 rounded object-contain" />
-                  )}
-                  <p className="text-sm text-slate-500">{lookup.brandName}</p>
-                </div>
-              )}
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
-                {lookup.ean && <span>EAN: <span className="font-mono text-slate-700">{lookup.ean}</span></span>}
-                {lookup.sku && <span>SKU: <span className="font-mono text-slate-700">{lookup.sku}</span></span>}
-              </div>
-              {lookup.description && (
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500">{lookup.description}</p>
-              )}
-            </div>
-          </div>
-        )}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
 
         {/* ── New product: not found info banner ── */}
         {lookup.state === "new" && !lookup.prefill && !notFoundBannerDismissed && (
@@ -867,8 +965,8 @@ export function BippaScanProductPanel({
           </div>
         )}
 
-        {/* ── New product: identity fields ── */}
-        {lookup.state === "new" && (
+        {/* ── Identity fields (prodotto in magazzino o nuovo da catalogo / manuale) ── */}
+        {(lookup.state === "found_product" || lookup.state === "new") && (
           <ManualProductEntryIdentityFields
             manualEan={manualEan}
             onManualEanChange={setManualEan}
@@ -887,14 +985,13 @@ export function BippaScanProductPanel({
             brandLoading={brandLoading}
             canCreateBrand={canCreateBrand}
             normalizedBrandSearch={normalizedBrandSearch}
-            onUseTypedBrand={() => { if (normalizedBrandSearch) setBrandDropdownOpen(false); }}
+            onUseTypedBrand={handleUseTypedBrand}
             manualSku={manualSku}
             onManualSkuChange={setManualSku}
             manualImageInputRef={manualImageInputRef}
             onManualImageFile={setManualImageFile}
             manualImageFile={manualImageFile}
             manualImagePreviewUrl={manualImagePreviewUrl}
-            catalogImageUrl={catalogImageUrl}
           />
         )}
 
@@ -928,6 +1025,14 @@ export function BippaScanProductPanel({
             setManualLots((prev) => prev.map((x) => (x.id === lotId ? { ...x, ...patch } : x)))
           }
         />
+        </div>
+
+        {productHeroImageUrl ? (
+          <ProductHeroImageColumn
+            imageUrl={productHeroImageUrl}
+            className="border-t border-slate-200 bg-slate-50/75 lg:w-[min(280px,28vw)] lg:border-l lg:border-t-0"
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -337,6 +337,15 @@ export function BippaScanExperience({
   const isCameraScanning = scanState === "scanning" || scanState === "success";
   const showProductPanel = Boolean(lastCode && clinicId);
   const panelKey = lastCode ?? "";
+  const [panelHeroImageUrl, setPanelHeroImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPanelHeroImageUrl(null);
+  }, [panelKey]);
+
+  const handleProductHeroImageUrl = useCallback((url: string | null) => {
+    setPanelHeroImageUrl(url);
+  }, []);
 
   const tabBarWrap =
     variant === "showcase"
@@ -358,7 +367,13 @@ export function BippaScanExperience({
   const shellClass =
     variant === "showcase"
       ? "flex w-full flex-col"
-      : `mx-auto flex w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl ${showProductPanel ? "max-w-4xl" : "max-w-sm"}`;
+      : `mx-auto flex w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl ${
+          showProductPanel
+            ? panelHeroImageUrl
+              ? "max-w-[min(96vw,1240px)]"
+              : "max-w-4xl"
+            : "max-w-sm"
+        }`;
 
   const successBanner =
     variant === "showcase"
@@ -672,6 +687,7 @@ export function BippaScanExperience({
               scannedCode={lastCode!}
               clinicId={clinicId ?? null}
               existingProductNames={existingProductNames}
+              onProductHeroImageUrlChange={variant === "default" ? handleProductHeroImageUrl : undefined}
               onCreated={async () => {
                 await onCreated?.();
               }}

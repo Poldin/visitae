@@ -29,7 +29,6 @@ type ManualProductEntryIdentityFieldsProps = {
   onManualImageFile: (file: File | null) => void;
   manualImageFile: File | null;
   manualImagePreviewUrl: string | null;
-  catalogImageUrl: string | null;
 };
 
 export function ManualProductEntryIdentityFields({
@@ -57,7 +56,6 @@ export function ManualProductEntryIdentityFields({
   onManualImageFile,
   manualImageFile,
   manualImagePreviewUrl,
-  catalogImageUrl,
 }: ManualProductEntryIdentityFieldsProps) {
   return (
     <div className="mb-6 grid max-w-3xl gap-3 sm:grid-cols-2">
@@ -197,17 +195,6 @@ export function ManualProductEntryIdentityFields({
                 />
               </div>
             ) : null}
-          </div>
-        ) : catalogImageUrl ? (
-          <div className="mt-2">
-            <p className="text-xs text-slate-500">Immagine da catalogo</p>
-            <div className="mt-1">
-              <img
-                src={catalogImageUrl}
-                alt=""
-                className="h-14 w-14 rounded-md border border-slate-200 object-cover"
-              />
-            </div>
           </div>
         ) : null}
       </div>

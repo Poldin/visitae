@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
+import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT, intentToHeaderMode } from "./constants";
@@ -9,6 +10,7 @@ import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLot
 import { ManualProductEntryHeader } from "./ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./ManualProductLotsSection";
+import { ProductHeroImageColumn } from "./ProductHeroImageColumn";
 import type {
   BrandOption,
   ExistingInventoryLot,
@@ -57,6 +59,7 @@ export function ManualProductEntryDialog({
   const brandBoxRef = useRef<HTMLDivElement | null>(null);
   const modeDropdownRef = useRef<HTMLDivElement | null>(null);
   const defaultLots = useMemo(() => [{ id: "lot-1", quantity: "1", lotCode: "", price: "", vat: "", expiryDate: "", location: "" }], []);
+  const prevOpenForAutosaveHydrationRef = useRef(false);
 
   const [overlayMounted, setOverlayMounted] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -65,6 +68,7 @@ export function ManualProductEntryDialog({
   const [headerMode, setHeaderMode] = useState<ManualProductEntryHeaderMode>("carico");
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
   const [existingInventoryLots, setExistingInventoryLots] = useState<ExistingInventoryLot[]>([]);
+  const [autosaveHydrationKey, setAutosaveHydrationKey] = useState(0);
 
   const existingNameSet = useMemo(() => new Set(existingNames.map((x) => x.trim().toLowerCase())), [existingNames]);
 
@@ -125,6 +129,13 @@ export function ManualProductEntryDialog({
       setCatalogImageUrl(null);
     }
   }, [open, catalogPrefill, defaultLots, titleIntent]);
+
+  useEffect(() => {
+    if (open && !prevOpenForAutosaveHydrationRef.current) {
+      setAutosaveHydrationKey((k) => k + 1);
+    }
+    prevOpenForAutosaveHydrationRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -376,6 +387,63 @@ export function ManualProductEntryDialog({
     }
     return null;
   }, [exactBrandMatch, catalogPrefill, normalizedBrandSearch]);
+
+  const productHeroImageUrl = useMemo(() => {
+    if (!open) return null;
+    if (manualImagePreviewUrl) return manualImagePreviewUrl;
+    const up = uploadedManualImageUrl?.trim();
+    if (up) return up;
+    const cat = catalogImageUrl?.trim();
+    if (cat) return cat;
+    const preImg = catalogPrefill?.imageUrl?.trim();
+    if (preImg) return preImg;
+    return null;
+  }, [open, manualImagePreviewUrl, uploadedManualImageUrl, catalogImageUrl, catalogPrefill?.imageUrl]);
+
+  const autosaveProductId =
+    manualCreatedProductId?.trim() || catalogPrefill?.existingProductId?.trim() || null;
+
+  const onCreatedRef = useRef(onCreated);
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated]);
+  const lastAutosaveEchoRef = useRef(0);
+
+  const onAutosaveImageUploaded = useCallback((publicUrl: string) => {
+    setUploadedManualImageUrl(publicUrl);
+    setCatalogImageUrl(publicUrl);
+    setManualImageFile(null);
+  }, []);
+
+  const onAutosavePersistError = useCallback((message: string) => {
+    setSubmitError(message);
+  }, []);
+
+  const onAutosaveEcho = useCallback(() => {
+    const now = Date.now();
+    if (now - lastAutosaveEchoRef.current < 2600) return;
+    lastAutosaveEchoRef.current = now;
+    void onCreatedRef.current?.();
+  }, []);
+
+  useProductIdentityAutosave({
+    enabled: Boolean(open && clinicId?.trim() && autosaveProductId),
+    clinicId,
+    productId: autosaveProductId,
+    hydrationKey: `${autosaveHydrationKey}|${autosaveProductId ?? ""}`,
+    manualName,
+    normalizedBrandSearch,
+    exactBrandMatch,
+    manualSku,
+    manualEan,
+    manualDescription,
+    uploadedManualImageUrl,
+    catalogImageUrl,
+    manualImageFile,
+    onImageUploaded: onAutosaveImageUploaded,
+    onPersistError: onAutosavePersistError,
+    onAutosaveApplied: onAutosaveEcho,
+  });
 
   const isLoadMode = headerMode === "carico" || headerMode === "nuovo";
   const isScaricoInventario = headerMode === "scarico" || headerMode === "inventario";
@@ -972,7 +1040,9 @@ export function ManualProductEntryDialog({
       }`}
     >
       <div
-        className={`flex min-h-[95vh] h-[95vh] w-full min-w-[70vw] max-w-[min(96vw,1400px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl transition duration-200 ease-out will-change-transform ${
+        className={`flex min-h-[95vh] h-[95vh] w-full min-w-[70vw] ${
+          productHeroImageUrl ? "max-w-[min(96vw,1520px)]" : "max-w-[min(96vw,1400px)]"
+        } flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl transition duration-200 ease-out will-change-transform ${
           overlayVisible ? "translate-y-0 scale-100 opacity-100" : "translate-y-1 scale-[0.98] opacity-0"
         }`}
         role="dialog"
@@ -993,7 +1063,9 @@ export function ManualProductEntryDialog({
 
         {submitError ? <div className="shrink-0 px-4 pt-3 text-sm text-rose-600 sm:px-6">{submitError}</div> : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+
           <ManualProductEntryIdentityFields
             manualEan={manualEan}
             onManualEanChange={setManualEan}
@@ -1025,7 +1097,6 @@ export function ManualProductEntryDialog({
             onManualImageFile={setManualImageFile}
             manualImageFile={manualImageFile}
             manualImagePreviewUrl={manualImagePreviewUrl}
-            catalogImageUrl={catalogImageUrl}
           />
           <ManualProductLotsSection
             density="compact"
@@ -1061,6 +1132,14 @@ export function ManualProductEntryDialog({
               setManualLots((prev) => prev.map((x) => (x.id === lotId ? { ...x, ...patch } : x)))
             }
           />
+          </div>
+
+          {productHeroImageUrl ? (
+            <ProductHeroImageColumn
+              imageUrl={productHeroImageUrl}
+              className="border-t border-slate-200 bg-slate-50/75 lg:w-[min(300px,30vw)] lg:border-l lg:border-t-0"
+            />
+          ) : null}
         </div>
       </div>
     </div>
