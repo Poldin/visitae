@@ -484,7 +484,11 @@ export function ManualProductLotsSection({
     isLoadMode && showExistingInventoryWhenLoad && existingInventoryLots.length > 0;
 
   const existingLotsPosQty = existingInventoryLots.filter((i) => i.quantity > 0);
-  const showExistingMicroTotals = showExistingLoadBanner && existingLotsPosQty.length > 1;
+  /** Micro-totali: carico (sopra riepilogo lotti) oppure scarico / inventario (sopre le righe operative). */
+  const showMicroTotals =
+    existingInventoryLots.length > 0 &&
+    existingLotsPosQty.length > 1 &&
+    ((isLoadMode && showExistingInventoryWhenLoad) || isScaricoInventario);
 
   let existingMicroTotalQty = 0;
   let existingMicroImponibile = 0;
@@ -501,11 +505,49 @@ export function ManualProductLotsSection({
   existingMicroImponibile = Math.round(existingMicroImponibile * 100) / 100;
   existingMicroGross = Math.round(existingMicroGross * 100) / 100;
 
+  const scaricoInventarioMicroAbove =
+    !showExistingLoadBanner && isScaricoInventario && showMicroTotals;
+
   const sectionOuterClass = compact
     ? "mt-0 max-w-none space-y-1.5"
     : showExistingLoadBanner
       ? "mt-0 max-w-3xl space-y-2"
-      : "mt-10 max-w-3xl space-y-2";
+      : scaricoInventarioMicroAbove
+        ? "mt-0 max-w-3xl space-y-2"
+        : "mt-10 max-w-3xl space-y-2";
+
+  const microTotalsBadges = showMicroTotals ? (
+    <div
+      className={
+        compact ? "mb-0.5 flex flex-wrap items-center gap-1.5" : "mb-1 flex flex-wrap items-center gap-1.5"
+      }
+    >
+      <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+        <span className="font-medium text-slate-400">Giacenza</span>
+        <span>
+          <span className="font-semibold text-slate-50">{existingMicroTotalQty}</span> pz
+        </span>
+      </span>
+      {existingMicroHasPrice ? (
+        <>
+          <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+            <span className="font-medium text-slate-400">Imponibile tot.</span>
+            <span className="font-semibold text-slate-50">
+              {fmtLotUnitPriceEur(existingMicroImponibile)}
+            </span>
+          </span>
+          <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
+            <span className="font-medium text-slate-400">tot.</span>
+            <span className="font-semibold text-slate-50">
+              {fmtLotUnitPriceEur(existingMicroGross)}
+            </span>
+            <span className="text-slate-400">IVA incl.</span>
+          </span>
+        </>
+      ) : null}
+    </div>
+  ) : null;
+
   const addWrapClass = compact ? "mt-1.5 max-w-none" : "mt-3 max-w-3xl";
   const addBtnClass = compact
     ? "inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
@@ -519,37 +561,7 @@ export function ManualProductLotsSection({
           {!compact ? (
             <p className="text-xs font-semibold tracking-wide text-slate-600">Giacenza attuale</p>
           ) : null}
-          {showExistingMicroTotals ? (
-            <div
-              className={
-                compact ? "mb-0.5 flex flex-wrap items-center gap-1.5" : "mb-1 flex flex-wrap items-center gap-1.5"
-              }
-            >
-              <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
-                <span className="font-medium text-slate-400">Giacenza</span>
-                <span>
-                  <span className="font-semibold text-slate-50">{existingMicroTotalQty}</span> pz
-                </span>
-              </span>
-              {existingMicroHasPrice ? (
-                <>
-                  <span className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
-                    <span className="font-medium text-slate-400">Imponibile tot.</span>
-                    <span className="font-semibold text-slate-50">
-                      {fmtLotUnitPriceEur(existingMicroImponibile)}
-                    </span>
-                  </span>
-                  <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0 rounded-md bg-slate-900 px-2 py-1 text-xs tabular-nums text-slate-100">
-                    <span className="font-medium text-slate-400">tot.</span>
-                    <span className="font-semibold text-slate-50">
-                      {fmtLotUnitPriceEur(existingMicroGross)}
-                    </span>
-                    <span className="text-slate-400">IVA incl.</span>
-                  </span>
-                </>
-              ) : null}
-            </div>
-          ) : null}
+          {microTotalsBadges}
           {existingInventoryLots.map((inv) => (
             <ExistingLotSummaryBar key={inv.inventoryItemId} inv={inv} />
           ))}
@@ -558,7 +570,11 @@ export function ManualProductLotsSection({
       {isScaricoInventario && lots.length === 0 ? (
         <p className={compact ? "text-[11px] text-slate-500" : "text-sm text-slate-500"}>{inventoryEmptyLabel}</p>
       ) : (
-        <div className={sectionOuterClass}>
+        <>
+          {scaricoInventarioMicroAbove ? (
+            <div className={compact ? "mb-1.5 max-w-none" : "mb-2 mt-10 max-w-3xl"}>{microTotalsBadges}</div>
+          ) : null}
+          <div className={sectionOuterClass}>
           {lots.map((lot, lotIdx) => (
             <ManualProductLotRow
               key={lot.id}
@@ -581,6 +597,7 @@ export function ManualProductLotsSection({
             />
           ))}
         </div>
+        </>
       )}
       {isLoadMode ? (
         <div className={addWrapClass}>
