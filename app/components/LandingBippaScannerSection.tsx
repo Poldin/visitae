@@ -29,8 +29,8 @@ export default function LandingBippaScannerSection() {
                 <p className="font-semibold text-zinc-900 dark:text-zinc-100">Scegli come leggere il codice</p>
                 <p className="mt-1 leading-relaxed">
                   La tab <strong className="text-zinc-800 dark:text-zinc-200">Telefono</strong> mostra un QR che apre lo
-                  scanner sul cellulare, già collegato a questa finestra — anche senza aver effettuato l&apos;accesso
-                  (sessione temporanea).
+                  scanner sul cellulare, collegato a questa finestra tramite un token temporaneo — senza effettuare
+                  l&apos;accesso.
                 </p>
               </div>
             </li>
