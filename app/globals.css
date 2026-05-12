@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #09090b;
+    --foreground: #f4f4f5;
+  }
 }
 
 @theme inline {
@@ -12,15 +19,191 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+::selection {
+  background: #e5e7eb;
+  color: #18181b;
+}
+
+::-moz-selection {
+  background: #e5e7eb;
+  color: #18181b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes stepFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bookingDaysSlideNext {
+  from {
+    transform: translateX(56px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes bookingDaysSlidePrev {
+  from {
+    transform: translateX(-56px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.booking-days-anim-next {
+  animation: bookingDaysSlideNext 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.booking-days-anim-prev {
+  animation: bookingDaysSlidePrev 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-days-anim-next,
+  .booking-days-anim-prev {
+    animation: none;
+  }
+}
+
+/* Landing: carosello marchi (tre righe) */
+@keyframes landing-brand-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-brand-marquee-clip {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 4%,
+    black 96%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 4%,
+    black 96%,
+    transparent
+  );
+}
+
+.landing-brand-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: landing-brand-marquee linear infinite;
+}
+
+.landing-brand-marquee-track-reverse {
+  animation-direction: reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-brand-marquee-track {
+    animation: none;
+    transform: none;
+    margin-inline: auto;
+    flex-wrap: wrap;
+    width: auto;
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .landing-brand-marquee-clip {
+    mask-image: none;
+  }
+}
+
+/* Magazzino onboarding · demo Bippa (linea lettura) */
+@keyframes bippa-scanner-sweep {
+  0%,
+  100% {
+    top: 12%;
+  }
+  50% {
+    top: 82%;
+  }
+}
+
+.bippa-scanner-line {
+  animation: bippa-scanner-sweep 1.75s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bippa-scanner-line {
+    animation: none;
+    top: 47%;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Stampa: solo il blocco lista di lavoro (solo se la vista è montata nell’agenda) */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body:has(#agenda-worklist-print-root) * {
+    visibility: hidden;
+  }
+  body:has(#agenda-worklist-print-root) #agenda-worklist-print-root,
+  body:has(#agenda-worklist-print-root) #agenda-worklist-print-root * {
+    visibility: visible;
+  }
+  body:has(#agenda-worklist-print-root) #agenda-worklist-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
 }
