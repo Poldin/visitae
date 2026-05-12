@@ -1,37 +1,50 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, NotFoundException } from "@zxing/library";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { useVideoBarcodeScan } from "@/lib/barcode-scanner";
 import { ScanBarcode, Camera, CameraOff, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
 type ScanState = "idle" | "scanning" | "success" | "error";
 
-export default function BippaRemotePage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+function getHashAuthTokenSnapshot(): string | null {
+  if (typeof window === "undefined") return null;
+  const h = window.location.hash.slice(1);
+  return h || null;
+}
+
+function subscribeToHash(cb: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("hashchange", cb);
+  return () => window.removeEventListener("hashchange", cb);
+}
+
+export default function BippaRemotePage() {
+  const routeParams = useParams();
+  const sessionId =
+    typeof routeParams?.sessionId === "string" && routeParams.sessionId.length > 0 ? routeParams.sessionId : null;
+
+  const token = useSyncExternalStore(
+    subscribeToHash,
+    getHashAuthTokenSnapshot,
+    () => null,
+  );
+
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [lastCode, setLastCode] = useState<string | null>(null);
   const [lastFormat, setLastFormat] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cameraAllowed, setCameraAllowed] = useState<boolean | null>(null);
-  const [readerReady, setReaderReady] = useState(false);
+
+  const scanReady = true;
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
-
-  // resolve params and token from hash
-  useEffect(() => {
-    params.then((p) => setSessionId(p.sessionId));
-  }, [params]);
+  const scanStateRef = useRef<ScanState>("idle");
 
   useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (hash) setToken(hash);
-  }, []);
+    scanStateRef.current = scanState;
+  }, [scanState]);
 
   // set up supabase realtime channel once we have sessionId + token
   useEffect(() => {
@@ -53,39 +66,36 @@ export default function BippaRemotePage({ params }: { params: Promise<{ sessionI
     };
   }, [sessionId, token]);
 
-  // init zxing reader
-  useEffect(() => {
-    const reader = new BrowserMultiFormatReader();
-    readerRef.current = reader;
-    setReaderReady(true);
-    return () => {
-      controlsRef.current?.stop();
-    };
+  const handleScan = useCallback((code: string, format: string) => {
+    setLastCode(code);
+    setLastFormat(format);
+    setScanState("success");
+
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "scan",
+      payload: { code, format },
+    });
+
+    setTimeout(() => {
+      setScanState("scanning");
+    }, 2000);
   }, []);
 
+  const { start: startVideoScan, stop: stopVideoScan } = useVideoBarcodeScan({
+    videoRef,
+    shouldDetect: () => scanStateRef.current === "scanning",
+    onDetect: handleScan,
+  });
+
   const startScanning = async () => {
-    if (!readerRef.current || !videoRef.current) return;
+    if (!videoRef.current) return;
     setError(null);
     setScanState("scanning");
 
     try {
-      const controls = await readerRef.current.decodeFromVideoDevice(
-        undefined,
-        videoRef.current,
-        (result, err) => {
-          if (result) {
-            const code = result.getText();
-            const format = BarcodeFormat[result.getBarcodeFormat()] ?? result.getBarcodeFormat().toString();
-            handleScan(code, format);
-          } else if (err && !(err instanceof NotFoundException)) {
-            // NotFoundException is normal when no barcode in frame — ignore
-          }
-        },
-      );
-      controlsRef.current = controls;
-      setCameraAllowed(true);
+      await startVideoScan();
     } catch (e: unknown) {
-      setCameraAllowed(false);
       setScanState("error");
       if (e instanceof Error) {
         if (e.name === "NotAllowedError") {
@@ -99,26 +109,8 @@ export default function BippaRemotePage({ params }: { params: Promise<{ sessionI
     }
   };
 
-  const handleScan = (code: string, format: string) => {
-    setLastCode(code);
-    setLastFormat(format);
-    setScanState("success");
-
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "scan",
-      payload: { code, format },
-    });
-
-    // resume scanning after a brief pause so the user sees the result
-    setTimeout(() => {
-      setScanState("scanning");
-    }, 2000);
-  };
-
   const stopScanning = () => {
-    controlsRef.current?.stop();
-    controlsRef.current = null;
+    stopVideoScan();
     setScanState("idle");
   };
 
@@ -212,11 +204,11 @@ export default function BippaRemotePage({ params }: { params: Promise<{ sessionI
         {!isScanning ? (
           <button
             type="button"
-            disabled={!readerReady}
+            disabled={!scanReady}
             onClick={startScanning}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 active:scale-95 disabled:opacity-50"
           >
-            {!readerReady ? (
+            {!scanReady ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
               <Camera size={18} />

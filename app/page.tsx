@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getLandingBrands } from "@/lib/getLandingBrands";
 import LandingBrandsMarquee from "./components/LandingBrandsMarquee";
+import LandingBippaScannerSection from "./components/LandingBippaScannerSection";
 import LandingMagazzinoOperationsDemo from "./components/LandingMagazzinoOperationsDemo";
 
 /** Ricarica i brand a ogni richiesta (evita homepage “graffiata senza marchi”). */
@@ -76,6 +77,8 @@ export default async function Page() {
           aria-hidden="true"
           className="relative left-1/2 h-px w-screen -translate-x-1/2 bg-[repeating-linear-gradient(to_right,#e4e4e7_0,#e4e4e7_18px,transparent_18px,transparent_30px)] dark:bg-[repeating-linear-gradient(to_right,#27272a_0,#27272a_18px,transparent_18px,transparent_30px)]"
         />
+
+        <LandingBippaScannerSection />
 
         <LandingBrandsMarquee brands={landingBrands} />
 
