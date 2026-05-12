@@ -220,8 +220,13 @@ export function StatisticsTab({
               <h3 className="text-sm font-semibold text-slate-800">Indice di Rotazione (Velocita di Consumo)</h3>
             </div>
             <p className="mb-2 text-xs text-slate-600">
-              Somma delle quantity negative in <code>stock_movements</code> (tipi <code>unload</code> e{' '}
-              <code>usage</code>) negli ultimi 30 giorni.
+              Somma delle quantità uscite negli ultimi 30 giorni per movimenti classificati come{' '}
+              <span className="font-medium text-slate-800">Scarico</span> nel sistema (tipi{' '}
+              <code className="rounded bg-slate-100 px-1 text-[11px]">unload</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 text-[11px]">usage</code>). Le{' '}
+              <span className="font-medium text-slate-800">Rettifiche inventario</span> (
+              <code className="rounded bg-slate-100 px-1 text-[11px]">inventory_adjust</code>) non concorrono a questo
+              indice.
             </p>
             <div className="mb-2 flex flex-wrap gap-2">
               <span className="inline-flex w-fit rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs text-indigo-800">

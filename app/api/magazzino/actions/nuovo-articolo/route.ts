@@ -22,7 +22,6 @@ type NuovoArticoloInput = {
   description?: string | null;
   imageUrl?: string | null;
   minStockLevel?: number | null;
-  movementType?: "manually_add" | "catalogue_add";
   movementNote?: string | null;
   lots: NuovoArticoloLotInput[];
 };
@@ -213,7 +212,6 @@ export async function POST(req: NextRequest) {
   const resolvedProducts: Array<{ index: number; productId: string; created: boolean }> = [];
   const rpcItems: Array<{
     product_id: string;
-    movement_type: string;
     movement_note: string;
     lots: Array<{
       quantity: number;
@@ -233,7 +231,7 @@ export async function POST(req: NextRequest) {
     }
 
     const fromCatalog = Boolean(cleanString(item.masterCatalogueId));
-    const baseNote = fromCatalog ? "Carico iniziale da catalogo" : "Carico iniziale da inserimento manuale";
+    const baseNote = fromCatalog ? "Primo carico da catalogo" : "Primo carico manuale";
     const lots = item.lots.map((lot) => {
       const vatVal =
         typeof lot.vat === "number" && Number.isFinite(lot.vat) ? Math.round(lot.vat * 100) / 100 : null;
@@ -260,7 +258,6 @@ export async function POST(req: NextRequest) {
 
     rpcItems.push({
       product_id: resolved.productId,
-      movement_type: item.movementType ?? (fromCatalog ? "catalogue_add" : "manually_add"),
       movement_note: movementNote,
       lots,
     });

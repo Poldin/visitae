@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
+import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT, intentToHeaderMode } from "./constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
@@ -443,10 +444,7 @@ export function ManualProductEntryDialog({
     productId: string,
     clinicIdValue: string,
     lot: ManualLotRow,
-    options: {
-      fromCatalog: boolean;
-      movementNote: string;
-    },
+    options?: { movementNote?: string },
   ): Promise<boolean> => {
     const supabase = getSupabaseAuthClient();
     if (!supabase) {
@@ -477,8 +475,7 @@ export function ManualProductEntryDialog({
         products: [
           {
             productId,
-            movementType: options.fromCatalog ? "catalogue_add" : "manually_add",
-            movementNote: options.movementNote,
+            ...(options?.movementNote ? { movementNote: options.movementNote } : {}),
             lots: [
               {
                 quantity,
@@ -600,10 +597,7 @@ export function ManualProductEntryDialog({
   const callNuovoArticoloApi = async (
     clinicIdValue: string,
     lot: ManualLotRow,
-    options: {
-      fromCatalog: boolean;
-      movementNote: string;
-    },
+    options?: { movementNote?: string },
   ): Promise<string | null> => {
     const supabase = getSupabaseAuthClient();
     if (!supabase) {
@@ -641,8 +635,7 @@ export function ManualProductEntryDialog({
       description: manualDescription.trim() || null,
       imageUrl,
       minStockLevel,
-      movementType: options.fromCatalog ? "catalogue_add" : "manually_add",
-      movementNote: options.movementNote,
+      ...(options?.movementNote ? { movementNote: options.movementNote } : {}),
       lots: [
         {
           quantity,
@@ -891,30 +884,19 @@ export function ManualProductEntryDialog({
     };
 
     if (isLoad) {
-      const parsedQuantity = Number(lot.quantity);
-      const fromCatalog = Boolean(catalogPrefill?.masterCatalogueId);
-      const baseNote = fromCatalog ? "Carico iniziale da catalogo" : "Carico iniziale da inserimento manuale";
-      const unitPrice = parseLotPriceUi(lot.price);
-      const vatPct = parseLotVatUi(lot.vat);
-      const movementNote =
-        unitPrice != null
-          ? `${baseNote} · Prezzo unit. impon.: ${unitPrice.toFixed(2).replace(".", ",")} €${
-              vatPct != null && vatPct > 0 ? ` · IVA ${vatPct}%` : ""
-            }`
-          : baseNote;
       if (headerMode !== "nuovo") {
         const productId = await ensureManualProduct();
         if (!productId) {
           setProcessingManualLotId(null);
           return;
         }
-        const lotSaved = await callCaricoApi(productId, clinicId, lot, { fromCatalog, movementNote });
+        const lotSaved = await callCaricoApi(productId, clinicId, lot);
         setProcessingManualLotId(null);
         if (!lotSaved) return;
         await refreshExistingInventoryLots({ productId });
         await onCreated();
       } else {
-        const newProductId = await callNuovoArticoloApi(clinicId, lot, { fromCatalog, movementNote });
+        const newProductId = await callNuovoArticoloApi(clinicId, lot);
         setProcessingManualLotId(null);
         if (!newProductId) return;
         setManualCreatedProductId(newProductId);
@@ -945,7 +927,13 @@ export function ManualProductEntryDialog({
         setProcessingManualLotId(null);
         return;
       }
-      const ok = await callScaricoApi(existingPid, clinicId, n, lot.id);
+      const ok = await callScaricoApi(
+        existingPid,
+        clinicId,
+        n,
+        lot.id,
+        buildScaricoNotes(lot.scaricoReasonId ?? DEFAULT_SCARICO_REASON_ID, lot.scaricoNoteDetail ?? ""),
+      );
       setProcessingManualLotId(null);
       if (!ok) return;
       await onCreated();

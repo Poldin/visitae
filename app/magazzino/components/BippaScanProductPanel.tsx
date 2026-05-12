@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
+import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
 import { BRAND_DROPDOWN_LIMIT } from "./manual-product-entry/constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
@@ -415,7 +416,7 @@ export function BippaScanProductPanel({
   }, [manualImageFile]);
 
   const callCaricoApi = useCallback(
-    async (productId: string, lot: ManualLotRow, opts: { fromCatalog: boolean; movementNote: string }): Promise<boolean> => {
+    async (productId: string, lot: ManualLotRow, opts?: { movementNote?: string }): Promise<boolean> => {
       const supabase = getSupabaseAuthClient();
       if (!supabase || !clinicId) { setSubmitError("Configurazione mancante."); return false; }
       const { data: sd } = await supabase.auth.getSession();
@@ -434,8 +435,7 @@ export function BippaScanProductPanel({
           clinicId,
           products: [{
             productId,
-            movementType: opts.fromCatalog ? "catalogue_add" : "manually_add",
-            movementNote: opts.movementNote,
+            ...(opts?.movementNote ? { movementNote: opts.movementNote } : {}),
             lots: [{
               quantity,
               expiryDate: lot.expiryDate || null,
@@ -501,7 +501,7 @@ export function BippaScanProductPanel({
   );
 
   const callNuovoArticoloApi = useCallback(
-    async (lot: ManualLotRow, opts: { fromCatalog: boolean; movementNote: string }): Promise<string | null> => {
+    async (lot: ManualLotRow, opts?: { movementNote?: string }): Promise<string | null> => {
       const supabase = getSupabaseAuthClient();
       if (!supabase || !clinicId) { setSubmitError("Configurazione mancante."); return null; }
       const { data: sd } = await supabase.auth.getSession();
@@ -538,8 +538,7 @@ export function BippaScanProductPanel({
             description: manualDescription.trim() || null,
             imageUrl,
             minStockLevel,
-            movementType: opts.fromCatalog ? "catalogue_add" : "manually_add",
-            movementNote: opts.movementNote,
+            ...(opts?.movementNote ? { movementNote: opts.movementNote } : {}),
             lots: [{
               quantity,
               expiryDate: lot.expiryDate || null,
@@ -693,25 +692,16 @@ export function BippaScanProductPanel({
       };
 
       if (isLoad) {
-        const fromCatalog = Boolean(catalogPrefill?.masterCatalogueId);
-        const baseNote = fromCatalog ? "Carico da catalogo (scan)" : "Carico da scansione codice";
-        const unitPrice = parseLotPriceUi(lot.price);
-        const vatPct = parseLotVatUi(lot.vat);
-        const movementNote =
-          unitPrice != null
-            ? `${baseNote} · Prezzo unit. impon.: ${unitPrice.toFixed(2).replace(".", ",")} €${vatPct != null && vatPct > 0 ? ` · IVA ${vatPct}%` : ""}`
-            : baseNote;
-
         if (headerMode !== "nuovo") {
           const productId = await ensureManualProduct();
           if (!productId) { setProcessingManualLotId(null); return; }
-          const ok = await callCaricoApi(productId, lot, { fromCatalog, movementNote });
+          const ok = await callCaricoApi(productId, lot);
           setProcessingManualLotId(null);
           if (!ok) return;
           await refreshExistingInventoryLots({ productId });
           await onCreated();
         } else {
-          const newId = await callNuovoArticoloApi(lot, { fromCatalog, movementNote });
+          const newId = await callNuovoArticoloApi(lot);
           setProcessingManualLotId(null);
           if (!newId) return;
           setManualCreatedProductId(newId);
@@ -736,7 +726,12 @@ export function BippaScanProductPanel({
       if (headerMode === "scarico") {
         if (currentLotStock == null) { setSubmitError("Lotto non valido."); setProcessingManualLotId(null); return; }
         if (n > currentLotStock) { setSubmitError("Quantità superiore alla giacenza del lotto."); setProcessingManualLotId(null); return; }
-        const ok = await callScaricoApi(existingPid, n, lot.id);
+        const ok = await callScaricoApi(
+          existingPid,
+          n,
+          lot.id,
+          buildScaricoNotes(lot.scaricoReasonId ?? DEFAULT_SCARICO_REASON_ID, lot.scaricoNoteDetail ?? ""),
+        );
         setProcessingManualLotId(null);
         if (!ok) return;
         await onCreated();

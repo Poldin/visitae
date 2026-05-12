@@ -5,6 +5,8 @@ import type { ChangeEvent } from "react";
 import { useEffect, useState } from "react";
 import { ExistingLotSummaryBar } from "./ExistingLotSummaryBar";
 import { InventoryLocationInput } from "./InventoryLocationInput";
+import { DEFAULT_SCARICO_REASON_ID, type ScaricoReasonId } from "@/app/magazzino/lib/scaricoNotes";
+import { ScaricoReasonFields } from "../ScaricoReasonFields";
 import {
   fmtLotPriceInput,
   fmtLotUnitPriceEur,
@@ -217,38 +219,52 @@ export function ManualProductLotRow({
 
   return (
     <div
-      className={`flex flex-wrap gap-x-2 gap-y-1 ${isScaricoInventario ? "" : compact ? "items-center" : "items-end"}`}
+      className={`flex flex-wrap gap-x-2 gap-y-1 ${
+        isScaricoInventario ? "items-center" : compact ? "items-center" : "items-end"
+      }`}
     >
       {isScaricoInventario ? (
-        <div className="min-w-0 w-full">
-          <div className={`flex flex-wrap items-center justify-start ${compact ? "gap-1.5" : "gap-x-2 gap-y-1"}`}>
-            <div className="min-w-0 w-fit max-w-full shrink-0">
-              {invRow ? (
-                <ExistingLotSummaryBar inv={invRow} />
-              ) : (
-                <p className={`text-slate-500 ${compact ? "text-[11px]" : "text-xs"}`}>Lotto non disponibile.</p>
-              )}
-            </div>
-            {headerMode === "inventario" && invRow ? (
-              <div className={compact ? "w-32 min-w-32 max-w-36" : "w-40 min-w-40 max-w-44"}>
-                {!compact ? (
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Posizione</label>
-                ) : null}
-                <InventoryLocationInput
-                  clinicId={clinicId}
-                  value={lot.location}
-                  onChange={(v) => onUpdateLotField(lot.id, { location: v })}
-                  compact={compact}
-                  disabled={saving}
-                />
-              </div>
-            ) : null}
-            <div className={qtyColClass}>
-              <input {...quantityInputProps} />
-            </div>
-            {confirmButton}
-            {isLoadMode ? trashButton : null}
+        <div
+          className={`flex min-w-0 w-full flex-wrap items-center justify-start ${compact ? "gap-1.5" : "gap-x-2 gap-y-1"}`}
+        >
+          <div className="min-w-0 w-fit max-w-full shrink-0">
+            {invRow ? (
+              <ExistingLotSummaryBar inv={invRow} />
+            ) : (
+              <p className={`text-slate-500 ${compact ? "text-[11px]" : "text-xs"}`}>Lotto non disponibile.</p>
+            )}
           </div>
+          {headerMode === "scarico" ? (
+            <ScaricoReasonFields
+              inline
+              compact={compact}
+              disabled={saving}
+              idPrefix={`scarico-${lot.id}`}
+              reasonId={(lot.scaricoReasonId as ScaricoReasonId | undefined) ?? DEFAULT_SCARICO_REASON_ID}
+              freeText={lot.scaricoNoteDetail ?? ""}
+              onReasonIdChange={(id) => onUpdateLotField(lot.id, { scaricoReasonId: id })}
+              onFreeTextChange={(v) => onUpdateLotField(lot.id, { scaricoNoteDetail: v })}
+            />
+          ) : null}
+          {headerMode === "inventario" && invRow ? (
+            <div className={compact ? "w-32 min-w-32 max-w-36" : "w-40 min-w-40 max-w-44"}>
+              {!compact ? (
+                <label className="mb-1 block text-xs font-medium text-slate-700">Posizione</label>
+              ) : null}
+              <InventoryLocationInput
+                clinicId={clinicId}
+                value={lot.location}
+                onChange={(v) => onUpdateLotField(lot.id, { location: v })}
+                compact={compact}
+                disabled={saving}
+              />
+            </div>
+          ) : null}
+          <div className={qtyColClass}>
+            <input {...quantityInputProps} />
+          </div>
+          {confirmButton}
+          {isLoadMode ? trashButton : null}
         </div>
       ) : (
         <>

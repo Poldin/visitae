@@ -30,6 +30,8 @@ import {
 } from "./components/ManualProductEntryDialog";
 import { ManualProductLotsSection } from "./components/manual-product-entry/ManualProductLotsSection";
 import type { ExistingInventoryLot, ManualLotRow } from "./components/manual-product-entry/types";
+import { formatMovementTypeLabel } from "@/app/magazzino/lib/movementTypeLabels";
+import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { parseLotPriceUi, parseLotVatUi, inventoryVatFromDb } from "./components/manual-product-entry/format";
 import { BippaScanDialog } from "./components/BippaScanDialog";
 import { DdtImportDialog } from "./components/DdtImportDialog";
@@ -121,16 +123,7 @@ function fmtDateTime(iso: string | null): string {
   }).format(d);
 }
 
-function fmtMovementType(value: string | null): string {
-  if (!value) return "—";
-  if (value === "manually_add") return "Aggiunta manuale";
-  if (value === "catalogue_add") return "Aggiunta da catalogo";
-  if (value === "purchase") return "Carico";
-  if (value === "unload" || value === "usage") return "Scarico";
-  if (value === "adjustment") return "Rettifica";
-  if (value === "expired") return "Scaduto";
-  return value;
-}
+const fmtMovementType = formatMovementTypeLabel;
 
 const MAGAZZINO_TABLE_SKELETON_ROWS = 8;
 
@@ -443,8 +436,6 @@ export default function MagazzinoPage() {
             products: [
               {
                 productId: product.id,
-                movementType: "manually_add",
-                movementNote: "Carico da riga espansa",
                 lots: [
                   {
                     quantity: Math.max(1, n),
@@ -511,7 +502,10 @@ export default function MagazzinoPage() {
               inventoryItemId: invRow.inventoryItemId,
               quantity: n,
               movementType: "unload",
-              movementNote: "Scarico merce (lotto singolo)",
+              movementNote: buildScaricoNotes(
+                row.scaricoReasonId ?? DEFAULT_SCARICO_REASON_ID,
+                row.scaricoNoteDetail ?? "",
+              ),
             }
           : {
               productId: product.id,

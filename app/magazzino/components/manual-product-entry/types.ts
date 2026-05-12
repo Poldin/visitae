@@ -43,6 +43,10 @@ export type ManualLotRow = {
   expiryDate: string;
   /** Memo posizione fisica (normalizzato in salvataggio). */
   location: string;
+  /** Modalità scarico: id motivo (vedi `SCARICO_REASON_OPTIONS`). */
+  scaricoReasonId?: string;
+  /** Modalità scarico: dettaglio libero nelle note movimento. */
+  scaricoNoteDetail?: string;
 };
 
 export type ExistingInventoryLot = {

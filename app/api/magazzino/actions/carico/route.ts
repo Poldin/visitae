@@ -23,7 +23,6 @@ type CaricoProductInput = {
   description?: string | null;
   imageUrl?: string | null;
   minStockLevel?: number | null;
-  movementType?: "manually_add" | "catalogue_add";
   movementNote?: string | null;
   lots: CaricoLotInput[];
 };
@@ -220,7 +219,6 @@ export async function POST(req: NextRequest) {
 
   const rpcItems: Array<{
     product_id: string;
-    movement_type: string;
     movement_note: string;
     lots: Array<{
       quantity: number;
@@ -241,9 +239,6 @@ export async function POST(req: NextRequest) {
     }
     const productId = resolved.productId;
 
-    const movementType =
-      productInput.movementType ??
-      (cleanString(productInput.masterCatalogueId) ? "catalogue_add" : "manually_add");
     const lots = productInput.lots.map((lot) => {
       const vatVal =
         typeof lot.vat === "number" && Number.isFinite(lot.vat) ? Math.round(lot.vat * 100) / 100 : null;
@@ -265,20 +260,15 @@ export async function POST(req: NextRequest) {
       if (loc) row.location = loc;
       return row;
     });
+    /** Opzionale: se assente, nota generata lato server (nessun obbligo di compilazione in UI). */
     const movementNote =
       cleanString(productInput.movementNote) ??
       (lots.length === 1
-        ? buildDefaultMovementNote(
-            productInput.lots[0],
-            cleanString(productInput.masterCatalogueId) ? "Carico iniziale da catalogo" : "Carico iniziale da inserimento manuale",
-          )
-        : cleanString(productInput.masterCatalogueId)
-          ? "Carico iniziale da catalogo"
-          : "Carico iniziale da inserimento manuale");
+        ? buildDefaultMovementNote(productInput.lots[0], "Carico merce")
+        : "Carico merce");
 
     rpcItems.push({
       product_id: productId,
-      movement_type: movementType,
       movement_note: movementNote,
       lots,
     });
