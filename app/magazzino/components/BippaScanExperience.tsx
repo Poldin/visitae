@@ -84,13 +84,13 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-2 text-[11px] font-semibold transition-all sm:flex-row sm:gap-1 sm:px-2 sm:text-xs ${
+      className={`relative flex h-6 min-h-0 flex-1 flex-row items-center justify-center gap-px rounded-sm px-0.5 py-0 text-[9px] font-medium leading-none transition-all sm:h-8 sm:gap-0.5 sm:rounded-xl sm:px-1.5 sm:py-0.5 sm:text-[11px] sm:font-semibold ${
         active ? activeC : idleC
       }`}
     >
-      <span className="inline-flex items-center gap-1">
-        <Icon size={14} className="shrink-0 opacity-90" aria-hidden />
-        <span className="leading-tight">{label}</span>
+      <span className="inline-flex items-center gap-px sm:gap-1">
+        <Icon className="size-2.5 shrink-0 opacity-90 sm:size-3.5" strokeWidth={2.25} aria-hidden />
+        <span className="truncate leading-none">{label}</span>
       </span>
       {badge ? (
         <span
@@ -430,8 +430,8 @@ export function BippaScanExperience({
 
   const tabBarWrap =
     variant === "showcase"
-      ? "mx-0 mb-4 flex rounded-2xl border border-white/10 bg-zinc-900/90 p-1 shadow-inner shadow-black/40 sm:mx-0"
-      : "mx-4 mb-3 flex rounded-xl bg-slate-100 p-1 sm:mx-5";
+      ? "mx-0 mb-1.5 flex rounded-lg border border-white/10 bg-zinc-900/90 p-px shadow-inner shadow-black/40 sm:mx-0 sm:mb-4 sm:rounded-2xl sm:p-1"
+      : "mx-4 mb-1 flex rounded-sm bg-slate-100 p-px sm:mx-5 sm:mb-3 sm:rounded-xl sm:p-1";
 
   const viewportClass =
     variant === "showcase"
