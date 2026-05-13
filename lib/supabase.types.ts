@@ -614,7 +614,7 @@ export type Database = {
           ean: string
           id: string
           image_url: string
-          manufacturer: string | null
+          manufacturer: string
           name: string
           sku: string
           tags: string[]
