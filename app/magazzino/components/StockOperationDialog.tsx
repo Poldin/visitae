@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, ClipboardCheck, Plus, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import {
   ManualProductEntryDialog,
@@ -11,7 +11,7 @@ import {
 
 export type StockOperationMode = "carico" | "scarico" | "inventario" | "nuovo";
 
-const STOCK_OPERATION_PAGE_SIZE = 100;
+const STOCK_OPERATION_PAGE_SIZE = 20;
 const rowBtn =
   "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50";
 
@@ -36,6 +36,7 @@ type MasterCatalogItem = {
   ean: string | null;
   image_url: string | null;
   default_min_stock: number | string | null;
+  manufacturer: string | null;
 };
 
 type StockOperationDialogProps = {
@@ -145,32 +146,35 @@ export function StockOperationDialog({
     };
   };
 
-  useEffect(() => {
+  /** Sync prima degli useEffect: evita fetch con query debouncata obsoleta e un doppio round-trip iniziale. */
+  useLayoutEffect(() => {
     if (!open) return;
-    const t = window.setTimeout(() => {
-      setMode(initialMode);
-      setProductQuery("");
-      setDebouncedSearch("");
-      setClinicProducts([]);
-      setClinicOffset(0);
-      setClinicHasMore(true);
-      setClinicLoading(false);
-      setCatalogItems([]);
-      setCatalogOffset(0);
-      setCatalogHasMore(true);
-      setCatalogError(null);
-      setManualEntryOpen(false);
-      setManualCatalogPrefill(null);
-      setManualEntryTitleIntent({ type: "default" });
-      setClinicHasRegisteredProducts(null);
-    }, 0);
-    return () => window.clearTimeout(t);
+    setMode(initialMode);
+    setProductQuery("");
+    setDebouncedSearch("");
+    setClinicProducts([]);
+    setClinicOffset(0);
+    setClinicHasMore(true);
+    setClinicLoading(false);
+    setCatalogItems([]);
+    setCatalogOffset(0);
+    setCatalogHasMore(true);
+    setCatalogError(null);
+    setManualEntryOpen(false);
+    setManualCatalogPrefill(null);
+    setManualEntryTitleIntent({ type: "default" });
+    setClinicHasRegisteredProducts(null);
   }, [open, initialMode]);
 
   useEffect(() => {
     if (!open) return;
+    const trimmed = productQuery.trim();
+    if (trimmed === "") {
+      setDebouncedSearch("");
+      return;
+    }
     const timeout = window.setTimeout(() => {
-      setDebouncedSearch(productQuery.trim());
+      setDebouncedSearch(trimmed);
     }, 300);
     return () => window.clearTimeout(timeout);
   }, [productQuery, open]);
@@ -593,10 +597,10 @@ export function StockOperationDialog({
                                   <p className="truncate text-xs text-slate-700">{item.brand}</p>
                                 </div>
                               ) : null}
-                              {(item.sku || item.ean) ? (
+                              {(item.manufacturer?.trim() || item.ean) ? (
                                 <p className="mt-1 text-[11px] text-slate-500">
-                                  {item.sku ? `SKU: ${item.sku}` : ""}
-                                  {item.sku && item.ean ? " • " : ""}
+                                  {item.manufacturer?.trim() ?? ""}
+                                  {item.manufacturer?.trim() && item.ean ? " • " : ""}
                                   {item.ean ? `EAN: ${item.ean}` : ""}
                                 </p>
                               ) : null}

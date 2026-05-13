@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase.types";
 
-const PAGE_SIZE_MAX = 100;
+const PAGE_SIZE_MAX = 20;
 
 type ProductRow = {
   id: string;
@@ -24,26 +24,7 @@ type BrandRow = {
   image_url: string | null;
 };
 
-type MasterCatalogRow = {
-  id: string;
-  name: string;
-  sku: string | null;
-  ean: string | null;
-  image_url: string | null;
-  tags: string[] | null;
-  default_min_stock: number | null;
-  brand_id: string | null;
-};
-
-type MasterExistingRow = {
-  master_catalogue_id: string | null;
-};
-
-type BrandCatalogRow = {
-  id: string;
-  name: string | null;
-  image_url: string | null;
-};
+type SearchMasterCatalogRow = Database["public"]["Functions"]["search_master_catalog"]["Returns"][number];
 
 function clean(value: string | null | undefined): string {
   return (value ?? "").trim();
@@ -106,16 +87,14 @@ export async function GET(req: NextRequest) {
     productsQuery = productsQuery.or(`name.ilike.%${query}%,sku.ilike.%${query}%,ean.ilike.%${query}%,category.ilike.%${query}%`);
   }
 
-  const [{ data: productsData, error: productsErr }, { data: invData, error: invErr }, { data: brandsData, error: brandsErr }, { data: existingData, error: existingErr }, { data: catalogBrandsData, error: catalogBrandsErr }] =
+  const [{ data: productsData, error: productsErr }, { data: invData, error: invErr }, { data: brandsData, error: brandsErr }] =
     await Promise.all([
       productsQuery,
       supabase.from("inventory_items").select("product_id,quantity").eq("clinic_id", clinicId),
       supabase.from("brands").select("name,image_url"),
-      supabase.from("products").select("master_catalogue_id").eq("clinic_id", clinicId).not("master_catalogue_id", "is", null),
-      supabase.from("brands").select("id,name,image_url"),
     ]);
 
-  const firstErr = productsErr ?? invErr ?? brandsErr ?? existingErr ?? catalogBrandsErr;
+  const firstErr = productsErr ?? invErr ?? brandsErr;
   if (firstErr) return NextResponse.json({ error: firstErr.message }, { status: 400 });
 
   const qtyByProduct = new Map<string, number>();
@@ -143,75 +122,36 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  const existingMasterIds = new Set<string>(
-    ((existingData ?? []) as MasterExistingRow[])
-      .map((r) => r.master_catalogue_id)
-      .filter((v): v is string => Boolean(v)),
-  );
-  const brandCatalogById = new Map<string, { name: string | null; image_url: string | null }>();
-  for (const row of (catalogBrandsData ?? []) as BrandCatalogRow[]) {
-    brandCatalogById.set(row.id, { name: row.name, image_url: row.image_url });
-  }
+  const rpcPageLimit = masterLimit + 1;
+  const { data: catalogRpcData, error: catalogRpcErr } = await supabase.rpc("search_master_catalog", {
+    search_text: query || undefined,
+    page_limit: rpcPageLimit,
+    page_offset: masterOffset,
+    target_clinic_id: clinicId,
+  });
+  if (catalogRpcErr) return NextResponse.json({ error: catalogRpcErr.message }, { status: 400 });
 
-  // Fill a page after removing existing clinic products.
-  const masterItems: Array<{
-    id: string;
-    name: string;
-    tags: string[] | null;
-    brand: string | null;
-    brand_image_url: string | null;
-    sku: string | null;
-    ean: string | null;
-    image_url: string | null;
-    default_min_stock: number | null;
-  }> = [];
-  let hasMoreMasterCatalog = false;
-  let fetchOffset = masterOffset;
-  const fetchChunk = Math.max(masterLimit * 2, 200);
-
-  while (masterItems.length < masterLimit + 1) {
-    let pageQuery = supabase
-      .from("master_catalog")
-      .select("id,name,sku,ean,image_url,tags,default_min_stock,brand_id")
-      .order("name", { ascending: true })
-      .range(fetchOffset, fetchOffset + fetchChunk - 1);
-    if (query) {
-      pageQuery = pageQuery.or(`name.ilike.%${query}%,sku.ilike.%${query}%,ean.ilike.%${query}%`);
-    }
-    const { data: chunkRows, error: chunkErr } = await pageQuery;
-    if (chunkErr) {
-      return NextResponse.json({ error: chunkErr.message }, { status: 400 });
-    }
-    const rows = (chunkRows ?? []) as MasterCatalogRow[];
-    if (!rows.length) break;
-
-    for (const m of rows) {
-      if (existingMasterIds.has(m.id)) continue;
-      const brandObj = m.brand_id ? brandCatalogById.get(m.brand_id) : null;
-      masterItems.push({
-        id: m.id,
-        name: m.name,
-        tags: m.tags,
-        brand: brandObj?.name ?? null,
-        brand_image_url: brandObj?.image_url ?? null,
-        sku: m.sku,
-        ean: m.ean,
-        image_url: m.image_url,
-        default_min_stock: m.default_min_stock,
-      });
-      if (masterItems.length >= masterLimit + 1) break;
-    }
-    fetchOffset += rows.length;
-    if (rows.length < fetchChunk) break;
-  }
+  const catalogRpcRows = (catalogRpcData ?? []) as SearchMasterCatalogRow[];
+  const hasMoreMasterCatalog = catalogRpcRows.length > masterLimit;
+  const masterCatalogItems = catalogRpcRows.slice(0, masterLimit).map((m) => ({
+    id: m.id,
+    name: m.name,
+    tags: m.tags ?? null,
+    brand: m.brand ?? null,
+    brand_image_url: m.brand_image_url ?? null,
+    sku: m.sku ?? null,
+    ean: m.ean ?? null,
+    image_url: m.image_url ?? null,
+    default_min_stock: m.default_min_stock != null ? Number(m.default_min_stock) : null,
+    manufacturer: m.manufacturer?.trim() ? m.manufacturer.trim() : null,
+  }));
 
   const hasMoreClinicProducts = (clinicProducts.length ?? 0) > clinicLimit;
   const clinicItems = clinicProducts.slice(0, clinicLimit);
-  hasMoreMasterCatalog = masterItems.length > masterLimit;
 
   return NextResponse.json({
     clinicProducts: clinicItems,
-    masterCatalogItems: masterItems.slice(0, masterLimit),
+    masterCatalogItems,
     clinicOffset,
     clinicLimit,
     masterOffset,

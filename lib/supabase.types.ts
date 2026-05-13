@@ -168,6 +168,45 @@ export type Database = {
           },
         ]
       }
+      manufacturers: {
+        Row: {
+          created_at: string | null
+          fiscal_code: string | null
+          full_legal_name: string | null
+          gs1_prefix: string | null
+          hibc_lic: string | null
+          id: string
+          legal_name_norm: string | null
+          metadata: Json | null
+          srn_code: string | null
+          VAT: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          fiscal_code?: string | null
+          full_legal_name?: string | null
+          gs1_prefix?: string | null
+          hibc_lic?: string | null
+          id?: string
+          legal_name_norm?: string | null
+          metadata?: Json | null
+          srn_code?: string | null
+          VAT?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          fiscal_code?: string | null
+          full_legal_name?: string | null
+          gs1_prefix?: string | null
+          hibc_lic?: string | null
+          id?: string
+          legal_name_norm?: string | null
+          metadata?: Json | null
+          srn_code?: string | null
+          VAT?: string | null
+        }
+        Relationships: []
+      }
       master_catalog: {
         Row: {
           brand_id: string | null
@@ -178,8 +217,10 @@ export type Database = {
           hibc_primary: string | null
           id: string
           image_url: string | null
+          manufacturer_id: string | null
           metadata: Json | null
           name: string
+          search_payload: string | null
           sku: string | null
           tags: string[] | null
           udi_di: string | null
@@ -193,8 +234,10 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          manufacturer_id?: string | null
           metadata?: Json | null
           name: string
+          search_payload?: string | null
           sku?: string | null
           tags?: string[] | null
           udi_di?: string | null
@@ -208,8 +251,10 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          manufacturer_id?: string | null
           metadata?: Json | null
           name?: string
+          search_payload?: string | null
           sku?: string | null
           tags?: string[] | null
           udi_di?: string | null
@@ -220,6 +265,13 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_catalog_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
             referencedColumns: ["id"]
           },
         ]
@@ -526,6 +578,20 @@ export type Database = {
           role: string
         }[]
       }
+      immutable_unaccent: { Args: { val: string }; Returns: string }
+      master_catalog_compute_search_tsv: {
+        Args: {
+          p_brand_name: string
+          p_default_description: string
+          p_ean: string
+          p_hibc_primary: string
+          p_name: string
+          p_sku: string
+          p_tags: string[]
+          p_udi_di: string
+        }
+        Returns: unknown
+      }
       normalize_inventory_location: { Args: { p_raw: string }; Returns: string }
       search_inventory_locations: {
         Args: { p_clinic_id: string; p_limit?: number; p_prefix?: string }
@@ -534,43 +600,26 @@ export type Database = {
           location: string
         }[]
       }
-      search_master_catalog:
-        | {
-            Args: {
-              page_limit?: number
-              page_offset?: number
-              search_text?: string
-            }
-            Returns: {
-              brand: string
-              default_min_stock: number
-              ean: string
-              id: string
-              image_url: string
-              name: string
-              sku: string
-              tags: string[]
-            }[]
-          }
-        | {
-            Args: {
-              page_limit?: number
-              page_offset?: number
-              search_text?: string
-              target_clinic_id?: string
-            }
-            Returns: {
-              brand: string
-              brand_image_url: string
-              default_min_stock: number
-              ean: string
-              id: string
-              image_url: string
-              name: string
-              sku: string
-              tags: string[]
-            }[]
-          }
+      search_master_catalog: {
+        Args: {
+          page_limit?: number
+          page_offset?: number
+          search_text?: string
+          target_clinic_id?: string
+        }
+        Returns: {
+          brand: string
+          brand_image_url: string
+          default_min_stock: number
+          ean: string
+          id: string
+          image_url: string
+          manufacturer: string | null
+          name: string
+          sku: string
+          tags: string[]
+        }[]
+      }
       set_my_active_clinic: {
         Args: { target_clinic_id: string }
         Returns: string
@@ -585,6 +634,18 @@ export type Database = {
           target_clinic_id: string
         }
         Returns: string
+      }
+      upsert_manufacturers_rdm_batch: {
+        Args: { p_rows: Json }
+        Returns: number
+      }
+      upsert_master_catalog_rdm_batch: {
+        Args: { p_rows: Json }
+        Returns: number
+      }
+      upsert_master_catalog_rdm_batch_insert_only: {
+        Args: { p_rows: Json }
+        Returns: number
       }
     }
     Enums: {
