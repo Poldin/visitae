@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { createStableStreakGate } from "./barcodeAcceptance";
+import { type StableStreakGate, createStableStreakGate } from "./barcodeAcceptance";
 import { getBarcodeEnginePreference } from "./engineConfig";
 import { loadRxingWasm } from "./loadRxing";
 import { startRxingVideoBarcodeScan } from "./rxingVideoScan";
@@ -14,6 +14,7 @@ export function useVideoBarcodeScan(options: {
 }) {
   const { videoRef, shouldDetect, onDetect } = options;
   const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const streakGateRef = useRef<StableStreakGate | null>(null);
   const shouldDetectRef = useRef(shouldDetect);
   const onDetectRef = useRef(onDetect);
 
@@ -28,9 +29,14 @@ export function useVideoBarcodeScan(options: {
   const stop = useCallback(() => {
     controlsRef.current?.stop();
     controlsRef.current = null;
+    streakGateRef.current = null;
   }, []);
 
   useEffect(() => () => stop(), [stop]);
+
+  const resetAcceptanceGate = useCallback(() => {
+    streakGateRef.current?.reset();
+  }, []);
 
   const start = useCallback(async () => {
     stop();
@@ -40,6 +46,7 @@ export function useVideoBarcodeScan(options: {
     const gate = createStableStreakGate({
       onConfirm: (code, fmt) => onDetectRef.current(code, fmt),
     });
+    streakGateRef.current = gate;
 
     const deliver = (code: string, fmt: string) => {
       if (!shouldDetectRef.current()) return;
@@ -72,5 +79,5 @@ export function useVideoBarcodeScan(options: {
     controlsRef.current = await startZxingVideoBarcodeScan(video, deliver, () => shouldDetectRef.current());
   }, [videoRef, stop]);
 
-  return { start, stop };
+  return { start, stop, resetAcceptanceGate };
 }

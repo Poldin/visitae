@@ -414,7 +414,7 @@ export type Database = {
           inventory_item_id: string | null
           movement_type: string | null
           notes: string | null
-          product_id: string
+          product_id: string | null
           quantity: number
         }
         Insert: {
@@ -425,7 +425,7 @@ export type Database = {
           inventory_item_id?: string | null
           movement_type?: string | null
           notes?: string | null
-          product_id: string
+          product_id?: string | null
           quantity: number
         }
         Update: {
@@ -436,7 +436,7 @@ export type Database = {
           inventory_item_id?: string | null
           movement_type?: string | null
           notes?: string | null
-          product_id?: string
+          product_id?: string | null
           quantity?: number
         }
         Relationships: [

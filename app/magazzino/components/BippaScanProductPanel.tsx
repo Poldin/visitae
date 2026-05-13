@@ -107,6 +107,8 @@ export function BippaScanProductPanel({
   useEffect(() => {
     if (!clinicId || !scannedCode) return;
 
+    let cancelled = false;
+
     setLookup({ state: "loading" });
     setNotFoundBannerDismissed(false);
     setSubmitError(null);
@@ -128,6 +130,8 @@ export function BippaScanProductPanel({
         .eq("clinic_id", clinicId)
         .or(`ean.eq.${scannedCode},udi_di.eq.${scannedCode},hibc_primary.eq.${scannedCode}`)
         .maybeSingle();
+
+      if (cancelled) return;
 
       if (product) {
         const meta = product.metadata as Record<string, unknown> | null;
@@ -166,6 +170,8 @@ export function BippaScanProductPanel({
         )
         .or(`ean.eq.${scannedCode},udi_di.eq.${scannedCode},hibc_primary.eq.${scannedCode}`)
         .maybeSingle();
+
+      if (cancelled) return;
 
       if (masterItem) {
         const mfr = masterItem.manufacturer as { full_legal_name: string | null } | null;
@@ -206,6 +212,9 @@ export function BippaScanProductPanel({
     };
 
     void run();
+    return () => {
+      cancelled = true;
+    };
   }, [scannedCode, clinicId]);
 
   // ── Existing inventory lots refresh ────────────────────────────────────────

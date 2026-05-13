@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import QRCode from "react-qr-code";
-import { formatBarcodeLabel, useVideoBarcodeScan } from "@/lib/barcode-scanner";
+import { parseBarcodePayload, useVideoBarcodeScan } from "@/lib/barcode-scanner";
+import { BarcodeDecodePanel, BarcodeKindBadge } from "./BippaScanDecodePanel";
 import { createBrowserClient } from "@supabase/ssr";
 import {
   ScanBarcode,
@@ -24,6 +25,9 @@ import { BippaScanProductPanel } from "./BippaScanProductPanel";
 export type BippaTab = "camera" | "phone" | "manual";
 const DEFAULT_BIPPA_TABS: readonly BippaTab[] = ["camera", "phone", "manual"];
 type ScanState = "idle" | "scanning" | "success" | "error";
+
+/** Dopo "Bippa ancora": silenzio lettura così il codice ancora inquadrato non si ri-accetta subito. */
+const RESUME_CAMERA_SUPPRESS_MS = 750;
 
 const TAB_UI: Record<BippaTab, { icon: React.ElementType; label: string; badge?: string }> = {
   camera: { icon: Camera, label: "Fotocamera" },
@@ -134,6 +138,14 @@ export function BippaScanExperience({
   const [camError, setCamError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanStateRef = useRef<ScanState>("idle");
+  /** Dopo "Bippa ancora" ignora i frame per un attimo: altrimenti lo stesso codice inquadrato si rilegge e il pannello rifà la query. */
+  const resumeDetectNotBeforeRef = useRef(0);
+  /**
+   * Quando si torna da "success" a "scanning" il layout cambia (showProductPanel: true→false) e il
+   * <video> viene rimontato. Salviamo qui il timestamp "suppress-until" e riavviamo lo stream in un
+   * effect, dopo che React ha stabilizzato il DOM.
+   */
+  const pendingCameraRestartRef = useRef<number | null>(null);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
@@ -186,9 +198,84 @@ export function BippaScanExperience({
       setQrToken(null);
       const tab = resolvedTabs.includes(initialTab) ? initialTab : (resolvedTabs[0] ?? "phone");
       setActiveTab(tab);
+      resumeDetectNotBeforeRef.current = 0;
     }
     prevActiveRef.current = active;
   }, [active, initialTab, resolvedTabs]);
+
+  const handleCode = useCallback(
+    (code: string, format: string) => {
+      if (performance.now() < resumeDetectNotBeforeRef.current) return;
+      setLastCode(code);
+      setLastFormat(format);
+      setScanState("success");
+      onCode?.(code, format);
+    },
+    [onCode],
+  );
+
+  const shouldDetectBarcode = useCallback(
+    () => scanStateRef.current === "scanning" && performance.now() >= resumeDetectNotBeforeRef.current,
+    [],
+  );
+
+  const { start: startVideoScan, stop: stopVideoScan } = useVideoBarcodeScan({
+    videoRef,
+    shouldDetect: shouldDetectBarcode,
+    onDetect: handleCode,
+  });
+
+  const resumeCameraAfterSuccess = useCallback(() => {
+    // Ferma subito lo stream: il <video> verrà rimontato se il layout cambia
+    // (showProductPanel: true → false). Il restart avviene nell'effect qui sotto,
+    // dopo che React ha stabilizzato il DOM.
+    stopVideoScan();
+    pendingCameraRestartRef.current = performance.now() + RESUME_CAMERA_SUPPRESS_MS;
+    scanStateRef.current = "idle";
+    setLastCode(null);
+    setLastFormat(null);
+    setScanState("idle");
+  }, [stopVideoScan]);
+
+  // Restart dello stream fotocamera dopo che il layout si è stabilizzato.
+  useEffect(() => {
+    if (scanState !== "idle" || pendingCameraRestartRef.current === null) return;
+    if (activeTab !== "camera" || !active) {
+      pendingCameraRestartRef.current = null;
+      return;
+    }
+    const suppressUntil = pendingCameraRestartRef.current;
+    pendingCameraRestartRef.current = null;
+    let cancelled = false;
+    // Piccolo delay per lasciare a React il tempo di committare il nuovo DOM
+    const t = window.setTimeout(async () => {
+      if (cancelled || !videoRef.current) return;
+      setCamError(null);
+      scanStateRef.current = "scanning";
+      setScanState("scanning");
+      resumeDetectNotBeforeRef.current = suppressUntil;
+      try {
+        await startVideoScan();
+      } catch (e: unknown) {
+        if (cancelled) return;
+        scanStateRef.current = "idle";
+        setScanState("error");
+        if (e instanceof Error) {
+          if (e.name === "NotAllowedError") {
+            setCamError("Accesso alla fotocamera negato. Abilita la fotocamera nelle impostazioni del browser.");
+          } else if (e.name === "NotFoundError") {
+            setCamError("Nessuna fotocamera trovata su questo dispositivo.");
+          } else {
+            setCamError(e.message);
+          }
+        }
+      }
+    }, 50);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [scanState, activeTab, active, startVideoScan]);
 
   useEffect(() => {
     if (!enableKeyboardShortcuts || !active) return;
@@ -200,32 +287,17 @@ export function BippaScanExperience({
       }
       if (e.key.toLowerCase() === "b" && activeTab === "camera" && scanStateRef.current === "success") {
         e.preventDefault();
-        setScanState("scanning");
+        resumeCameraAfterSuccess();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [enableKeyboardShortcuts, active, onKeyboardClose, activeTab]);
-
-  const handleCode = useCallback(
-    (code: string, format: string) => {
-      setLastCode(code);
-      setLastFormat(format);
-      setScanState("success");
-      onCode?.(code, format);
-    },
-    [onCode],
-  );
-
-  const { start: startVideoScan, stop: stopVideoScan } = useVideoBarcodeScan({
-    videoRef,
-    shouldDetect: () => scanStateRef.current === "scanning",
-    onDetect: handleCode,
-  });
+  }, [enableKeyboardShortcuts, active, activeTab, onKeyboardClose, resumeCameraAfterSuccess]);
 
   useEffect(() => {
     if (activeTab !== "camera" || !active) {
       stopVideoScan();
+      resumeDetectNotBeforeRef.current = 0;
       setScanState((s) => (s === "scanning" || s === "success" ? "idle" : s));
     }
   }, [activeTab, active, stopVideoScan]);
@@ -250,6 +322,8 @@ export function BippaScanExperience({
   const startCamera = async () => {
     if (!videoRef.current) return;
     setCamError(null);
+    resumeDetectNotBeforeRef.current = 0;
+    scanStateRef.current = "scanning";
     setScanState("scanning");
     try {
       await startVideoScan();
@@ -269,6 +343,8 @@ export function BippaScanExperience({
 
   const stopCamera = () => {
     stopVideoScan();
+    resumeDetectNotBeforeRef.current = 0;
+    scanStateRef.current = "idle";
     setScanState("idle");
   };
 
@@ -347,6 +423,11 @@ export function BippaScanExperience({
     setPanelHeroImageUrl(url);
   }, []);
 
+  const parsedCode = useMemo(
+    () => (lastCode && lastFormat ? parseBarcodePayload(lastCode, lastFormat) : null),
+    [lastCode, lastFormat],
+  );
+
   const tabBarWrap =
     variant === "showcase"
       ? "mx-0 mb-4 flex rounded-2xl border border-white/10 bg-zinc-900/90 p-1 shadow-inner shadow-black/40 sm:mx-0"
@@ -380,6 +461,12 @@ export function BippaScanExperience({
       ? "mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5"
       : "mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2";
 
+  /** Stesso banner successo, senza margine top (il `gap-3` del blocco fotocamera basta). */
+  const successBannerFlush =
+    variant === "showcase"
+      ? "flex shrink-0 items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5"
+      : "flex shrink-0 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2";
+
   const scannerPanelContent = (
     <>
       <div className={tabBarWrap}>
@@ -405,7 +492,7 @@ export function BippaScanExperience({
         }`}
       >
         {activeTab === "camera" && (
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-3">
             <div className={viewportClass} style={{ height: 220 }}>
               <video
                 ref={videoRef}
@@ -468,7 +555,7 @@ export function BippaScanExperience({
             ) : scanState === "success" ? (
               <button
                 type="button"
-                onClick={() => setScanState("scanning")}
+                onClick={resumeCameraAfterSuccess}
                 className={
                   variant === "showcase"
                     ? "flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 active:scale-[0.98]"
@@ -496,15 +583,45 @@ export function BippaScanExperience({
               </button>
             )}
 
-            {variant === "showcase" && lastCode && !showProductPanel && (
-              <div className="mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5">
-                <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-sm font-semibold text-emerald-100">{lastCode}</p>
-                  {lastFormat && (
-                    <p className="text-xs text-emerald-300/90">{formatBarcodeLabel(lastFormat)}</p>
+            {lastCode && !showProductPanel && (
+              <div className="flex flex-col gap-1">
+                <div className={successBannerFlush}>
+                  <CheckCircle2 size={16} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate font-mono text-sm font-semibold ${variant === "showcase" ? "text-emerald-100" : "text-emerald-800"}`}>
+                      {lastCode}
+                    </p>
+                  </div>
+                  {parsedCode && lastFormat && (
+                    <BarcodeKindBadge parsed={parsedCode} format={lastFormat} variant={variant} />
                   )}
                 </div>
+                {parsedCode && <BarcodeDecodePanel parsed={parsedCode} variant={variant} />}
+              </div>
+            )}
+
+            {showProductPanel && lastCode && (
+              <div className="flex flex-col gap-1">
+                <div
+                  className={
+                    variant === "showcase"
+                      ? "flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-zinc-800/50 px-3 py-2"
+                      : "flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                  }
+                >
+                  <CheckCircle2 size={14} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
+                  <p
+                    className={`truncate font-mono text-xs font-medium ${variant === "showcase" ? "text-zinc-200" : "text-slate-700"}`}
+                  >
+                    {lastCode}
+                  </p>
+                  {parsedCode && lastFormat && (
+                    <span className="ml-auto shrink-0">
+                      <BarcodeKindBadge parsed={parsedCode} format={lastFormat} variant={variant} />
+                    </span>
+                  )}
+                </div>
+                {parsedCode && <BarcodeDecodePanel parsed={parsedCode} variant={variant} />}
               </div>
             )}
           </div>
@@ -627,43 +744,45 @@ export function BippaScanExperience({
           </div>
         )}
 
-        {lastCode && !showProductPanel && !(variant === "showcase" && activeTab === "camera") && (
-          <div className={successBanner}>
-            <CheckCircle2 size={16} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
-            <div className="min-w-0">
-              <p
-                className={`truncate font-mono text-sm font-semibold ${variant === "showcase" ? "text-emerald-100" : "text-emerald-800"}`}
-              >
-                {lastCode}
-              </p>
-              {lastFormat && (
-                <p className={`text-xs ${variant === "showcase" ? "text-emerald-300/90" : "text-emerald-600"}`}>
-                  {formatBarcodeLabel(lastFormat)}
+        {lastCode && !showProductPanel && activeTab !== "camera" && (
+          <div className="flex flex-col gap-1">
+            <div className={successBanner}>
+              <CheckCircle2 size={16} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
+              <div className="min-w-0 flex-1">
+                <p className={`truncate font-mono text-sm font-semibold ${variant === "showcase" ? "text-emerald-100" : "text-emerald-800"}`}>
+                  {lastCode}
                 </p>
+              </div>
+              {parsedCode && lastFormat && (
+                <BarcodeKindBadge parsed={parsedCode} format={lastFormat} variant={variant} />
               )}
             </div>
+            {parsedCode && <BarcodeDecodePanel parsed={parsedCode} variant={variant} />}
           </div>
         )}
 
-        {showProductPanel && lastCode && (
-          <div
-            className={
-              variant === "showcase"
-                ? "mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-800/50 px-3 py-2"
-                : "mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-            }
-          >
-            <CheckCircle2 size={14} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
-            <p
-              className={`truncate font-mono text-xs font-medium ${variant === "showcase" ? "text-zinc-200" : "text-slate-700"}`}
+        {showProductPanel && lastCode && activeTab !== "camera" && (
+          <div className="mt-3 flex flex-col gap-1">
+            <div
+              className={
+                variant === "showcase"
+                  ? "flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-800/50 px-3 py-2"
+                  : "flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              }
             >
-              {lastCode}
-            </p>
-            {lastFormat && (
-              <span className={`ml-auto shrink-0 text-[10px] ${variant === "showcase" ? "text-zinc-500" : "text-slate-400"}`}>
-                {formatBarcodeLabel(lastFormat)}
-              </span>
-            )}
+              <CheckCircle2 size={14} className={`shrink-0 ${variant === "showcase" ? "text-emerald-400" : "text-emerald-500"}`} />
+              <p
+                className={`truncate font-mono text-xs font-medium ${variant === "showcase" ? "text-zinc-200" : "text-slate-700"}`}
+              >
+                {lastCode}
+              </p>
+              {parsedCode && lastFormat && (
+                <span className="ml-auto shrink-0">
+                  <BarcodeKindBadge parsed={parsedCode} format={lastFormat} variant={variant} />
+                </span>
+              )}
+            </div>
+            {parsedCode && <BarcodeDecodePanel parsed={parsedCode} variant={variant} />}
           </div>
         )}
       </div>
@@ -692,9 +811,12 @@ export function BippaScanExperience({
                 await onCreated?.();
               }}
               onReset={() => {
+                if (activeTab === "camera" && scanStateRef.current === "success") {
+                  resumeCameraAfterSuccess();
+                  return;
+                }
                 setLastCode(null);
                 setLastFormat(null);
-                setScanState(activeTab === "camera" && scanState === "success" ? "scanning" : scanState);
               }}
             />
           </div>
