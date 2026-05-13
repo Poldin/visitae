@@ -458,7 +458,7 @@ export function StockOperationDialog({
               type="search"
               value={productQuery}
               onChange={(e) => setProductQuery(e.target.value)}
-              placeholder="Nome, SKU, brand, EAN..."
+              placeholder="Nome, SKU, produttore, EAN..."
               className="h-9 w-full rounded-md border border-slate-200 pl-8 pr-3 text-sm text-slate-600"
             />
           </div>

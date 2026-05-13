@@ -47,8 +47,8 @@ type ProductRow = {
   ean: string | null;
   udi: string | null;
   hibc: string | null;
-  brand: string | null;
-  brandImageUrl: string | null;
+  manufacturer: string | null;
+  manufacturerImageUrl: string | null;
   imageUrl: string | null;
   category: string | null;
   minStock: number;
@@ -92,8 +92,8 @@ type MovementRow = {
   productId: string;
   sku: string;
   productName: string;
-  brand: string | null;
-  brandImageUrl: string | null;
+  manufacturer: string | null;
+  manufacturerImageUrl: string | null;
 };
 
 type MyClinicRpcRow = {
@@ -305,7 +305,7 @@ function productRowToManualPrefill(p: ProductRow): ManualProductCatalogPrefill {
     currentStockQty: p.totalQty,
     name: p.name,
     description: null,
-    manufacturer: p.brand?.trim() || null,
+    manufacturer: p.manufacturer?.trim() || null,
     sku: p.sku ? p.sku : null,
     ean: p.ean,
     imageUrl: p.imageUrl,
@@ -1068,7 +1068,7 @@ export default function MagazzinoPage() {
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Img</th>
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Prodotto</th>
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">EAN · UDI · HIBC</th>
-                        <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Brand</th>
+                        <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Produttore</th>
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Qtà totale</th>
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Prossima scadenza</th>
                         <th className="sticky top-0 z-10 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600" />
@@ -1128,17 +1128,17 @@ export default function MagazzinoPage() {
                               </td>
                               <td className="px-3 py-2">
                                 <span className="inline-flex items-center gap-2">
-                                  {p.brandImageUrl ? (
+                                  {p.manufacturerImageUrl ? (
                                     <Image
-                                      src={p.brandImageUrl}
-                                      alt={p.brand ?? "Brand"}
+                                      src={p.manufacturerImageUrl}
+                                      alt={p.manufacturer ?? "Produttore"}
                                       width={20}
                                       height={20}
                                       className="h-5 w-5 rounded-sm border border-slate-200 object-cover"
                                       sizes="20px"
                                     />
                                   ) : null}
-                                  <span>{p.brand ?? "—"}</span>
+                                  <span>{p.manufacturer ?? "—"}</span>
                                 </span>
                               </td>
                               <td className="px-3 py-2 font-semibold tabular-nums">{p.totalQty}</td>
@@ -1416,7 +1416,7 @@ export default function MagazzinoPage() {
                       <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Tipo</th>
                       <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">SKU</th>
                       <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Prodotto</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Brand</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Produttore</th>
                       <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Qty</th>
                       <th className="px-3 py-2 text-[11px] font-semibold text-slate-600">Note</th>
                     </tr>
@@ -1434,17 +1434,17 @@ export default function MagazzinoPage() {
                           <td className="px-3 py-2">{m.productName}</td>
                           <td className="px-3 py-2">
                             <span className="inline-flex items-center gap-2">
-                              {m.brandImageUrl ? (
+                              {m.manufacturerImageUrl ? (
                                 <Image
-                                  src={m.brandImageUrl}
-                                  alt={m.brand ?? "Brand"}
+                                  src={m.manufacturerImageUrl}
+                                  alt={m.manufacturer ?? "Produttore"}
                                   width={20}
                                   height={20}
                                   className="h-5 w-5 rounded-sm border border-slate-200 object-cover"
                                   sizes="20px"
                                 />
                               ) : null}
-                              <span>{m.brand ?? "—"}</span>
+                              <span>{m.manufacturer ?? "—"}</span>
                             </span>
                           </td>
                           <td className="px-3 py-2 tabular-nums">{m.quantity}</td>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getManufacturerFromMetadata } from "@/app/magazzino/lib/productBrandDisplay";
 import type { Database } from "@/lib/supabase.types";
 
 const MAX_PAGE_SIZE = 100;
@@ -14,8 +15,8 @@ type MovementApiRow = {
   productId: string;
   sku: string;
   productName: string;
-  brand: string | null;
-  brandImageUrl: string | null;
+  manufacturer: string | null;
+  manufacturerImageUrl: string | null;
 };
 
 type MovementDbRow = {
@@ -39,14 +40,6 @@ type BrandDbRow = {
   name: string | null;
   image_url: string | null;
 };
-
-function getBrandFromMetadata(metadata: unknown): string | null {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
-  const rawBrand = (metadata as { brand?: unknown }).brand;
-  if (typeof rawBrand !== "string") return null;
-  const normalized = rawBrand.trim();
-  return normalized || null;
-}
 
 function getSkuFromMetadata(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
@@ -121,18 +114,18 @@ export async function GET(req: NextRequest) {
     {
       sku: string;
       productName: string;
-      brand: string | null;
-      brandImageUrl: string | null;
+      manufacturer: string | null;
+      manufacturerImageUrl: string | null;
     }
   >();
   for (const product of (productsData ?? []) as ProductDbRow[]) {
-    const brand = getBrandFromMetadata(product.metadata) ?? product.category ?? null;
-    const key = (brand ?? "").trim().toLowerCase();
+    const manufacturer = getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
+    const key = (manufacturer ?? "").trim().toLowerCase();
     productMap.set(product.id, {
       sku: product.sku?.trim() || getSkuFromMetadata(product.metadata) || "",
       productName: product.name ?? "Prodotto",
-      brand,
-      brandImageUrl: key ? brandImageByName.get(key) ?? null : null,
+      manufacturer,
+      manufacturerImageUrl: key ? brandImageByName.get(key) ?? null : null,
     });
   }
 
@@ -147,8 +140,8 @@ export async function GET(req: NextRequest) {
       productId: m.product_id,
       sku: p?.sku ?? "",
       productName: p?.productName ?? "Prodotto",
-      brand: p?.brand ?? null,
-      brandImageUrl: p?.brandImageUrl ?? null,
+      manufacturer: p?.manufacturer ?? null,
+      manufacturerImageUrl: p?.manufacturerImageUrl ?? null,
     };
   });
 

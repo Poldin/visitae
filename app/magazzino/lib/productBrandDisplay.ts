@@ -1,4 +1,4 @@
-/** Stessa semantica di `app/api/magazzino/products/route.ts` per label brand in UI magazzino. */
+/** Etichetta produttore / brand legacy in UI magazzino (allineato a `stock-item` e prodotti). */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase.types";
@@ -11,12 +11,20 @@ export function getBrandFromMetadata(metadata: unknown): string | null {
   return normalized || null;
 }
 
+/** Preferisce `metadata.manufacturer`, poi `metadata.brand` (legacy). */
+export function getManufacturerFromMetadata(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const rawMfr = (metadata as { manufacturer?: unknown }).manufacturer;
+  if (typeof rawMfr === "string" && rawMfr.trim()) return rawMfr.trim();
+  return getBrandFromMetadata(metadata);
+}
+
 export function resolveProductBrandLabel(params: {
   metadata: unknown;
   category?: string | null;
   joinedBrand?: { name?: string | null } | null;
 }): string {
-  const meta = getBrandFromMetadata(params.metadata);
+  const meta = getManufacturerFromMetadata(params.metadata);
   if (meta) return meta;
   const cat = params.category?.trim();
   if (cat) return cat;

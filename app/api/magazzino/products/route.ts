@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { inventoryVatFromDb } from "@/app/magazzino/components/manual-product-entry/format";
+import { getManufacturerFromMetadata } from "@/app/magazzino/lib/productBrandDisplay";
 import type { Database } from "@/lib/supabase.types";
 
 const MAX_PAGE_SIZE = 100;
@@ -47,8 +48,8 @@ type ProductRow = {
   ean: string | null;
   udi: string | null;
   hibc: string | null;
-  brand: string | null;
-  brandImageUrl: string | null;
+  manufacturer: string | null;
+  manufacturerImageUrl: string | null;
   imageUrl: string | null;
   category: string | null;
   minStock: number;
@@ -112,14 +113,6 @@ type BrandDbRow = {
   name: string | null;
   image_url: string | null;
 };
-
-function getBrandFromMetadata(metadata: unknown): string | null {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
-  const rawBrand = (metadata as { brand?: unknown }).brand;
-  if (typeof rawBrand !== "string") return null;
-  const normalized = rawBrand.trim();
-  return normalized || null;
-}
 
 function getSkuFromMetadata(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
@@ -255,6 +248,7 @@ function applyFiltersAndSort(rows: ProductRow[], query: string, sortField: Produ
       p.name.toLowerCase().includes(q) ||
       p.sku.toLowerCase().includes(q) ||
       (p.category ?? "").toLowerCase().includes(q) ||
+      (p.manufacturer ?? "").toLowerCase().includes(q) ||
       (p.ean ?? "").toLowerCase().includes(q) ||
       (p.udi ?? "").toLowerCase().includes(q) ||
       (p.hibc ?? "").toLowerCase().includes(q);
@@ -424,6 +418,8 @@ export async function GET(req: NextRequest) {
         .sort()
         .reverse()[0] ?? null;
 
+    const mfrLabel = getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
+    const mfrKey = (mfrLabel ?? "").trim().toLowerCase();
     return {
       id: p.id,
       sku: p.sku?.trim() || getSkuFromMetadata(p.metadata) || "",
@@ -431,8 +427,8 @@ export async function GET(req: NextRequest) {
       ean: p.ean?.trim() || getEanFromMetadata(p.metadata),
       udi: p.udi_di?.trim() || getUdiFromMetadata(p.metadata),
       hibc: p.hibc_primary?.trim() || getHibcFromMetadata(p.metadata),
-      brand: getBrandFromMetadata(p.metadata) ?? p.category ?? null,
-      brandImageUrl: brandImageByName.get((getBrandFromMetadata(p.metadata) ?? p.category ?? "").trim().toLowerCase()) ?? null,
+      manufacturer: mfrLabel,
+      manufacturerImageUrl: mfrKey ? brandImageByName.get(mfrKey) ?? null : null,
       imageUrl: p.image_url ?? null,
       category: p.category ?? null,
       minStock: Number(p.min_stock_level ?? 0),
