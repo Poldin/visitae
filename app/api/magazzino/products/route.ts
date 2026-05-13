@@ -83,6 +83,7 @@ type ProductDbRow = {
   category: string | null;
   min_stock_level: number | null;
   image_url: string | null;
+  manufacturer_join: { full_legal_name: string | null } | null;
 };
 
 type InventoryDbRow = {
@@ -330,9 +331,11 @@ export async function GET(req: NextRequest) {
   const [{ data: pData, error: pErr }, { data: brandData, error: brandErr }, { data: iData, error: iErr }, { data: mData, error: mErr }] =
     await Promise.all([
       supabase
-        .from("products")
-        .select("id,name,sku,ean,udi_di,hibc_primary,metadata,category,min_stock_level,image_url")
-        .eq("clinic_id", clinicId),
+      .from("products")
+      .select(
+        "id,name,sku,ean,udi_di,hibc_primary,metadata,category,min_stock_level,image_url,manufacturer_join:manufacturer_id(full_legal_name)",
+      )
+      .eq("clinic_id", clinicId),
       supabase.from("brands").select("name,image_url"),
       supabase
         .from("inventory_items")
@@ -418,7 +421,8 @@ export async function GET(req: NextRequest) {
         .sort()
         .reverse()[0] ?? null;
 
-    const mfrLabel = getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
+    const mfrFromFk = p.manufacturer_join?.full_legal_name?.trim() ?? null;
+    const mfrLabel = mfrFromFk ?? getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
     const mfrKey = (mfrLabel ?? "").trim().toLowerCase();
     return {
       id: p.id,

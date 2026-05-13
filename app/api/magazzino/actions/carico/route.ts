@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { fetchManufacturerIdByMasterCatalogId } from "@/app/magazzino/lib/masterCatalogManufacturer";
 import { splitProductIdentifierForInsert } from "@/app/magazzino/lib/productIdentifierColumns";
 import type { Database } from "@/lib/supabase.types";
 
@@ -18,7 +19,9 @@ type CaricoProductInput = {
   productId?: string;
   masterCatalogueId?: string | null;
   name?: string;
+  /** Legacy nome API; preferire `manufacturer`. */
   brand?: string | null;
+  manufacturer?: string | null;
   sku?: string | null;
   ean?: string | null;
   description?: string | null;
@@ -100,14 +103,14 @@ async function resolveProductId(
   const name = cleanString(input.name);
   if (!name) return { productId: null, error: "name obbligatorio quando productId non è fornito." };
 
-  const brand = cleanString(input.brand);
+  const manufacturerLabel = cleanString(input.brand) ?? cleanString(input.manufacturer);
   const sku = cleanString(input.sku);
   const scanLine = cleanString(input.ean);
   const { ean, udi_di, hibc_primary, metadataEan } = splitProductIdentifierForInsert(scanLine);
   const metadata =
-    brand || sku || metadataEan
+    manufacturerLabel || sku || metadataEan
       ? {
-          ...(brand ? { brand } : {}),
+          ...(manufacturerLabel ? { manufacturer: manufacturerLabel } : {}),
           ...(sku ? { sku } : {}),
           ...(metadataEan ? { ean: metadataEan } : {}),
         }
@@ -115,12 +118,13 @@ async function resolveProductId(
   const minStockRaw = typeof input.minStockLevel === "number" && Number.isFinite(input.minStockLevel) ? input.minStockLevel : 0;
   const description = cleanString(input.description);
   const imageUrl = cleanString(input.imageUrl);
+  const manufacturerId = await fetchManufacturerIdByMasterCatalogId(supabase, masterCatalogueId);
 
   const insertPayload: Database["public"]["Tables"]["products"]["Insert"] = {
     clinic_id: clinicId,
     name,
     sku: null,
-    category: brand,
+    category: manufacturerLabel,
     min_stock_level: minStockRaw,
     image_url: imageUrl,
     description,
@@ -129,6 +133,7 @@ async function resolveProductId(
     hibc_primary,
     metadata,
     master_catalogue_id: masterCatalogueId,
+    ...(manufacturerId ? { manufacturer_id: manufacturerId } : {}),
   };
 
   const { data: created, error: createErr } = await supabase.from("products").insert(insertPayload).select("id").single<ProductRow>();

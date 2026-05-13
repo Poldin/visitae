@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { fetchManufacturerIdByMasterCatalogId } from "@/app/magazzino/lib/masterCatalogManufacturer";
 import { splitProductIdentifierForInsert } from "@/app/magazzino/lib/productIdentifierColumns";
 import type { Database } from "@/lib/supabase.types";
 
@@ -18,6 +19,7 @@ type NuovoArticoloInput = {
   masterCatalogueId?: string | null;
   name?: string;
   brand?: string | null;
+  manufacturer?: string | null;
   sku?: string | null;
   ean?: string | null;
   description?: string | null;
@@ -104,14 +106,14 @@ async function resolveOrCreateProduct(
   if (existingByNameErr) return { productId: null, error: existingByNameErr.message, created: false };
   if (existingByName?.id) return { productId: existingByName.id, error: null, created: false };
 
-  const brand = cleanString(item.brand);
+  const manufacturerLabel = cleanString(item.brand) ?? cleanString(item.manufacturer);
   const sku = cleanString(item.sku);
   const scanLine = cleanString(item.ean);
   const { ean, udi_di, hibc_primary, metadataEan } = splitProductIdentifierForInsert(scanLine);
   const metadata =
-    brand || sku || metadataEan
+    manufacturerLabel || sku || metadataEan
       ? {
-          ...(brand ? { brand } : {}),
+          ...(manufacturerLabel ? { manufacturer: manufacturerLabel } : {}),
           ...(sku ? { sku } : {}),
           ...(metadataEan ? { ean: metadataEan } : {}),
         }
@@ -119,12 +121,13 @@ async function resolveOrCreateProduct(
   const minStockRaw = typeof item.minStockLevel === "number" && Number.isFinite(item.minStockLevel) ? item.minStockLevel : 0;
   const description = cleanString(item.description);
   const imageUrl = cleanString(item.imageUrl);
+  const manufacturerId = await fetchManufacturerIdByMasterCatalogId(supabase, masterCatalogueId);
 
   const insertPayload: Database["public"]["Tables"]["products"]["Insert"] = {
     clinic_id: clinicId,
     name,
     sku: null,
-    category: brand,
+    category: manufacturerLabel,
     min_stock_level: minStockRaw,
     image_url: imageUrl,
     description,
@@ -133,6 +136,7 @@ async function resolveOrCreateProduct(
     hibc_primary,
     metadata,
     master_catalogue_id: masterCatalogueId,
+    ...(manufacturerId ? { manufacturer_id: manufacturerId } : {}),
   };
 
   const { data: created, error: createErr } = await supabase

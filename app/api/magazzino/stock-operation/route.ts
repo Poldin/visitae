@@ -12,6 +12,8 @@ type ProductRow = {
   category: string | null;
   image_url: string | null;
   metadata: unknown;
+  description: string | null;
+  manufacturer_join: { full_legal_name: string | null } | null;
 };
 
 type InventoryQtyRow = {
@@ -75,12 +77,16 @@ export async function GET(req: NextRequest) {
 
   let productsQuery = supabase
     .from("products")
-    .select("id,name,sku,ean,category,image_url,metadata")
+    .select(
+      "id,name,sku,ean,category,image_url,metadata,description,manufacturer_join:manufacturer_id(full_legal_name)",
+    )
     .eq("clinic_id", clinicId)
     .order("name", { ascending: true })
     .range(clinicOffset, clinicOffset + clinicLimit);
   if (query) {
-    productsQuery = productsQuery.or(`name.ilike.%${query}%,sku.ilike.%${query}%,ean.ilike.%${query}%,category.ilike.%${query}%`);
+    productsQuery = productsQuery.or(
+      `name.ilike.%${query}%,sku.ilike.%${query}%,ean.ilike.%${query}%,category.ilike.%${query}%,description.ilike.%${query}%`,
+    );
   }
 
   const [{ data: productsData, error: productsErr }, { data: invData, error: invErr }] =
@@ -98,7 +104,9 @@ export async function GET(req: NextRequest) {
   }
 
   const clinicProducts = ((productsData ?? []) as ProductRow[]).map((p) => {
-    const manufacturer = getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
+    const manufacturerFromFk = p.manufacturer_join?.full_legal_name?.trim() ?? null;
+    const manufacturer = manufacturerFromFk ?? getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
+    const desc = p.description?.trim() ? p.description.trim() : null;
     return {
       id: p.id,
       name: p.name,
@@ -107,6 +115,7 @@ export async function GET(req: NextRequest) {
       imageUrl: p.image_url,
       totalQty: qtyByProduct.get(p.id) ?? 0,
       ean: p.ean?.trim() || getEanFromMetadata(p.metadata),
+      description: desc,
     };
   });
 

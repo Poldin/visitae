@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
+import { fetchManufacturerIdByMasterCatalogId } from "@/app/magazzino/lib/masterCatalogManufacturer";
 import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
 import { ManualProductEntryHeader } from "./manual-product-entry/ManualProductEntryHeader";
@@ -601,7 +602,8 @@ export function BippaScanProductPanel({
       return null;
     }
 
-    const manufacturerValue = manualManufacturer.trim() || null;
+    const manufacturerValue =
+      manualManufacturer.trim() || catalogPrefill?.manufacturer?.trim() || null;
     const metadata =
       manufacturerValue || manualSku.trim() || manualEan.trim()
         ? {
@@ -624,6 +626,11 @@ export function BippaScanProductPanel({
     const min_stock_level = Number.isFinite(minStockRaw) ? minStockRaw : 0;
     const categoryValue = manufacturerValue || catalogPrefill?.manufacturer || catalogPrefill?.tags?.[0] || null;
 
+    let manufacturerIdFromMaster: string | null = null;
+    if (masterId) {
+      manufacturerIdFromMaster = await fetchManufacturerIdByMasterCatalogId(supabase, masterId);
+    }
+
     setSaving(true);
     setSubmitError(null);
     const insertPayload: Record<string, unknown> = {
@@ -637,6 +644,7 @@ export function BippaScanProductPanel({
       metadata,
     };
     if (masterId) insertPayload.master_catalogue_id = masterId;
+    if (manufacturerIdFromMaster) insertPayload.manufacturer_id = manufacturerIdFromMaster;
 
     const { data: created, error } = await supabase
       .from("products")

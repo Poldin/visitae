@@ -34,6 +34,7 @@ type ProductDbRow = {
   sku: string | null;
   category: string | null;
   metadata: unknown;
+  manufacturer_join: { full_legal_name: string | null } | null;
 };
 
 type BrandDbRow = {
@@ -92,7 +93,10 @@ export async function GET(req: NextRequest) {
         .eq("clinic_id", clinicId)
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1),
-      supabase.from("products").select("id,name,sku,category,metadata").eq("clinic_id", clinicId),
+      supabase
+        .from("products")
+        .select("id,name,sku,category,metadata,manufacturer_join:manufacturer_id(full_legal_name)")
+        .eq("clinic_id", clinicId),
       supabase.from("brands").select("name,image_url"),
     ]);
 
@@ -119,7 +123,8 @@ export async function GET(req: NextRequest) {
     }
   >();
   for (const product of (productsData ?? []) as ProductDbRow[]) {
-    const manufacturer = getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
+    const manufacturerFromFk = product.manufacturer_join?.full_legal_name?.trim() ?? null;
+    const manufacturer = manufacturerFromFk ?? getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
     const key = (manufacturer ?? "").trim().toLowerCase();
     productMap.set(product.id, {
       sku: product.sku?.trim() || getSkuFromMetadata(product.metadata) || "",

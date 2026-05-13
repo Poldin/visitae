@@ -299,6 +299,7 @@ export type Database = {
           hibc_primary: string | null
           id: string
           image_url: string | null
+          manufacturer_id: string | null
           master_catalogue_id: string | null
           metadata: Json | null
           min_stock_level: number | null
@@ -317,6 +318,7 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          manufacturer_id?: string | null
           master_catalogue_id?: string | null
           metadata?: Json | null
           min_stock_level?: number | null
@@ -335,6 +337,7 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          manufacturer_id?: string | null
           master_catalogue_id?: string | null
           metadata?: Json | null
           min_stock_level?: number | null
@@ -356,6 +359,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
             referencedColumns: ["id"]
           },
           {

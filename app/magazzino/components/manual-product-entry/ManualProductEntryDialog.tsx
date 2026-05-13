@@ -5,6 +5,7 @@ import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
+import { fetchManufacturerIdByMasterCatalogId } from "@/app/magazzino/lib/masterCatalogManufacturer";
 import { intentToHeaderMode } from "./constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
 import { ManualProductEntryHeader } from "./ManualProductEntryHeader";
@@ -717,7 +718,8 @@ export function ManualProductEntryDialog({
       setSubmitError("Prodotto gia presente nel tuo magazzino.");
       return null;
     }
-    const manufacturerValue = manualManufacturer.trim() || null;
+    const manufacturerValue =
+      manualManufacturer.trim() || catalogPrefill?.manufacturer?.trim() || null;
     const manualSkuValue = manualSku.trim() || null;
     const manualEanValue = manualEan.trim() || null;
     const metadata =
@@ -748,6 +750,11 @@ export function ManualProductEntryDialog({
       catalogPrefill?.tags?.[0] ||
       null;
 
+    let manufacturerIdFromMaster: string | null = null;
+    if (masterId) {
+      manufacturerIdFromMaster = await fetchManufacturerIdByMasterCatalogId(supabase, masterId);
+    }
+
     setSaving(true);
     setSubmitError(null);
     const insertPayload: Record<string, unknown> = {
@@ -762,6 +769,9 @@ export function ManualProductEntryDialog({
     };
     if (masterId) {
       insertPayload.master_catalogue_id = masterId;
+    }
+    if (manufacturerIdFromMaster) {
+      insertPayload.manufacturer_id = manufacturerIdFromMaster;
     }
     const { data: createdProduct, error } = await supabase
       .from("products")

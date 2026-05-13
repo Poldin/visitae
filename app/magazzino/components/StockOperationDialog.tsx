@@ -31,6 +31,7 @@ export type StockProductSummary = {
   imageUrl: string | null;
   totalQty: number;
   ean: string | null;
+  description: string | null;
 };
 
 type MasterCatalogItem = {
@@ -522,15 +523,27 @@ export function StockOperationDialog({
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
-                            {p.manufacturer?.trim() ? (
-                              <p className="mt-0.5 truncate text-xs text-slate-600">{p.manufacturer}</p>
-                            ) : null}
-                            {(p.sku || p.ean) ? (
-                              <p className="mt-1 text-[11px] text-emerald-900/70">
-                                {p.sku ? `SKU: ${p.sku}` : ""}
-                                {p.sku && p.ean ? " • " : ""}
-                                {p.ean ? `EAN: ${p.ean}` : ""}
+                            {p.description?.trim() ? (
+                              <p className="mt-1 line-clamp-2 text-[11px] text-slate-600">
+                                {p.description.trim()}
                               </p>
+                            ) : null}
+                            {(p.manufacturer?.trim() || p.ean) ? (
+                              <div className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-500">
+                                {p.manufacturer?.trim() ? (
+                                  <Factory
+                                    size={12}
+                                    strokeWidth={1.25}
+                                    className="mt-0.5 shrink-0 text-slate-400"
+                                    aria-hidden
+                                  />
+                                ) : null}
+                                <p className="min-w-0 flex-1 leading-snug">
+                                  {p.manufacturer?.trim() ?? ""}
+                                  {p.manufacturer?.trim() && p.ean ? " • " : ""}
+                                  {p.ean ? `EAN: ${p.ean}` : ""}
+                                </p>
+                              </div>
                             ) : null}
                           </div>
                         </div>

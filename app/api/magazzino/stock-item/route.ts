@@ -74,7 +74,9 @@ export async function GET(req: NextRequest) {
     const [{ data: product, error: productErr }, { data: invRows, error: invErr }] = await Promise.all([
       supabase
         .from("products")
-        .select("id,name,sku,ean,category,image_url,metadata,description")
+        .select(
+          "id,name,sku,ean,category,image_url,metadata,description,manufacturer_join:manufacturer_id(full_legal_name)",
+        )
         .eq("clinic_id", clinicId)
         .eq("id", itemId)
         .maybeSingle(),
@@ -85,7 +87,10 @@ export async function GET(req: NextRequest) {
     if (!product) return NextResponse.json({ error: "Prodotto clinica non trovato." }, { status: 404 });
 
     const totalQty = (invRows ?? []).reduce((s, r) => s + Number((r as { quantity: number }).quantity ?? 0), 0);
-    const manufacturer = getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
+    const manufacturerFromFk = (product as { manufacturer_join?: { full_legal_name: string | null } | null })
+      .manufacturer_join?.full_legal_name?.trim() ?? null;
+    const manufacturer =
+      manufacturerFromFk ?? getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
     const resolvedMode = getResolvedMode(selectedMode, true);
     const description = clean(product.description) || null;
     return NextResponse.json({
@@ -116,7 +121,9 @@ export async function GET(req: NextRequest) {
       .maybeSingle(),
     supabase
       .from("products")
-      .select("id,name,sku,ean,category,image_url,metadata,description")
+      .select(
+        "id,name,sku,ean,category,image_url,metadata,description,manufacturer_join:manufacturer_id(full_legal_name)",
+      )
       .eq("clinic_id", clinicId)
       .eq("master_catalogue_id", itemId)
       .maybeSingle(),
@@ -150,7 +157,13 @@ export async function GET(req: NextRequest) {
       currentStockQty: totalQty,
       name: existing?.name ?? master.name,
       description,
-      manufacturer: manufacturerName ?? getManufacturerFromMetadata(existing?.metadata) ?? existing?.category ?? null,
+      manufacturer:
+        manufacturerName ??
+        (existing as { manufacturer_join?: { full_legal_name: string | null } | null } | null)?.manufacturer_join
+          ?.full_legal_name?.trim() ??
+        getManufacturerFromMetadata(existing?.metadata) ??
+        existing?.category ??
+        null,
       sku: existing?.sku ?? master.sku,
       ean: existing?.ean ?? master.ean,
       imageUrl: existing?.image_url ?? master.image_url,
