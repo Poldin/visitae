@@ -290,6 +290,7 @@ export type Database = {
       }
       products: {
         Row: {
+          aic_code: string | null
           brand_id: string | null
           category: string | null
           clinic_id: string
@@ -309,6 +310,7 @@ export type Database = {
           udi_di: string | null
         }
         Insert: {
+          aic_code?: string | null
           brand_id?: string | null
           category?: string | null
           clinic_id: string
@@ -328,6 +330,7 @@ export type Database = {
           udi_di?: string | null
         }
         Update: {
+          aic_code?: string | null
           brand_id?: string | null
           category?: string | null
           clinic_id?: string
