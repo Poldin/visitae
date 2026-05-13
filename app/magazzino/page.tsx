@@ -14,7 +14,6 @@ import {
   Plus,
   ScanBarcode,
   ShoppingBag,
-  Truck,
   Warehouse,
   X,
 } from "lucide-react";
@@ -34,7 +33,6 @@ import { formatMovementTypeLabel } from "@/app/magazzino/lib/movementTypeLabels"
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { parseLotPriceUi, parseLotVatUi, inventoryVatFromDb } from "./components/manual-product-entry/format";
 import { BippaScanDialog } from "./components/BippaScanDialog";
-import { DdtImportDialog } from "./components/DdtImportDialog";
 import { StockOperationDialog, type StockOperationMode } from "./components/StockOperationDialog";
 import { StatisticsTab } from "./components/StatisticsTab";
 
@@ -341,7 +339,6 @@ export default function MagazzinoPage() {
   const [stockDialogOpen, setStockDialogOpen] = useState(false);
   const [stockDialogMode, setStockDialogMode] = useState<StockOperationMode>("carico");
   const [bippaDialogOpen, setBippaDialogOpen] = useState(false);
-  const [ddtDialogOpen, setDdtDialogOpen] = useState(false);
   const [rowManualEntryOpen, setRowManualEntryOpen] = useState(false);
   const [rowManualPrefill, setRowManualPrefill] = useState<ManualProductCatalogPrefill | null>(null);
   const [rowManualTitleIntent, setRowManualTitleIntent] = useState<ManualProductEntryTitleIntent>({
@@ -385,10 +382,6 @@ export default function MagazzinoPage() {
 
   const handleBippa = useCallback(() => {
     setBippaDialogOpen(true);
-  }, []);
-
-  const handleDdt = useCallback(() => {
-    setDdtDialogOpen(true);
   }, []);
 
   const getAccessToken = useCallback(async () => {
@@ -861,7 +854,7 @@ export default function MagazzinoPage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (stockDialogOpen || rowManualEntryOpen || bippaDialogOpen || ddtDialogOpen) return;
+      if (stockDialogOpen || rowManualEntryOpen || bippaDialogOpen) return;
       const key = event.key.toLowerCase();
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
@@ -880,11 +873,6 @@ export default function MagazzinoPage() {
       if (key === "b") {
         event.preventDefault();
         handleBippa();
-        return;
-      }
-      if (key === "d") {
-        event.preventDefault();
-        handleDdt();
         return;
       }
       if (key === "r") {
@@ -909,9 +897,7 @@ export default function MagazzinoPage() {
     stockDialogOpen,
     rowManualEntryOpen,
     bippaDialogOpen,
-    ddtDialogOpen,
     handleBippa,
-    handleDdt,
     handleCarico,
     handleScarico,
     handleInventario,
@@ -1019,14 +1005,6 @@ export default function MagazzinoPage() {
                       onClick={handleBippa}
                       icon={ScanBarcode}
                       iconClassName="text-slate-700"
-                    />
-                    <MagazzinoToolbarActionButton
-                      title="DDT (D)"
-                      label="DDT"
-                      shortcut="D"
-                      onClick={handleDdt}
-                      icon={Truck}
-                      iconClassName="text-amber-700"
                     />
                     <MagazzinoToolbarActionButton
                       title="Carico merce (R)"
@@ -1488,7 +1466,6 @@ export default function MagazzinoPage() {
         existingProductNames={products.map((p) => p.name)}
         onCreated={runLoadData}
       />
-      <DdtImportDialog open={ddtDialogOpen} onClose={() => setDdtDialogOpen(false)} />
       <StockOperationDialog
         open={stockDialogOpen}
         clinicId={clinicId}
