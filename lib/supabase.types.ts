@@ -209,7 +209,9 @@ export type Database = {
       }
       master_catalog: {
         Row: {
+          aic_code: string | null
           brand_id: string | null
+          cod_catalogo_fabbr_ass: string | null
           created_at: string | null
           default_description: string | null
           default_min_stock: number | null
@@ -217,16 +219,20 @@ export type Database = {
           hibc_primary: string | null
           id: string
           image_url: string | null
+          log_execution_cleaning: string | null
           manufacturer_id: string | null
           metadata: Json | null
           name: string
           search_payload: string | null
+          search_payload_tsvector: unknown
           sku: string | null
           tags: string[] | null
           udi_di: string | null
         }
         Insert: {
+          aic_code?: string | null
           brand_id?: string | null
+          cod_catalogo_fabbr_ass?: string | null
           created_at?: string | null
           default_description?: string | null
           default_min_stock?: number | null
@@ -234,16 +240,20 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          log_execution_cleaning?: string | null
           manufacturer_id?: string | null
           metadata?: Json | null
           name: string
           search_payload?: string | null
+          search_payload_tsvector?: unknown
           sku?: string | null
           tags?: string[] | null
           udi_di?: string | null
         }
         Update: {
+          aic_code?: string | null
           brand_id?: string | null
+          cod_catalogo_fabbr_ass?: string | null
           created_at?: string | null
           default_description?: string | null
           default_min_stock?: number | null
@@ -251,10 +261,12 @@ export type Database = {
           hibc_primary?: string | null
           id?: string
           image_url?: string | null
+          log_execution_cleaning?: string | null
           manufacturer_id?: string | null
           metadata?: Json | null
           name?: string
           search_payload?: string | null
+          search_payload_tsvector?: unknown
           sku?: string | null
           tags?: string[] | null
           udi_di?: string | null
@@ -562,6 +574,10 @@ export type Database = {
         Args: { p_clinic_id: string; p_items: Json }
         Returns: Json
       }
+      backfill_master_catalog_tsvector: {
+        Args: { batch_size?: number }
+        Returns: number
+      }
       create_clinic_and_assign: {
         Args: { clinic_address_text?: string; clinic_name: string }
         Returns: string
@@ -593,6 +609,10 @@ export type Database = {
         Returns: unknown
       }
       normalize_inventory_location: { Args: { p_raw: string }; Returns: string }
+      normalize_manufacturer_legal_name: {
+        Args: { p_text: string }
+        Returns: string
+      }
       search_inventory_locations: {
         Args: { p_clinic_id: string; p_limit?: number; p_prefix?: string }
         Returns: {
@@ -610,6 +630,7 @@ export type Database = {
         Returns: {
           brand: string
           brand_image_url: string
+          default_description: string
           default_min_stock: number
           ean: string
           id: string
@@ -626,6 +647,14 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      sync_master_catalog_aifa_farmaci_batch: {
+        Args: { p_rows: Json }
+        Returns: Json
+      }
+      sync_master_catalog_rdm_csv_batch: {
+        Args: { p_rows: Json }
+        Returns: Json
+      }
       unaccent: { Args: { "": string }; Returns: string }
       update_my_clinic: {
         Args: {

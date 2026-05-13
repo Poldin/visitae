@@ -2,27 +2,16 @@
 
 import { ImagePlus } from "lucide-react";
 import type { RefObject } from "react";
-import type { BrandOption, ManualProductCatalogPrefill } from "./types";
 
 type ManualProductEntryIdentityFieldsProps = {
   manualEan: string;
   onManualEanChange: (v: string) => void;
   manualName: string;
   onManualNameChange: (v: string) => void;
-  brandBoxRef: RefObject<HTMLDivElement | null>;
-  brandSearch: string;
-  onBrandSearchChange: (v: string) => void;
-  onPickBrand: (name: string) => void;
-  onBrandFocusOpen: () => void;
-  brandDropdownOpen: boolean;
-  selectedBrandImageUrl: string | null;
-  exactBrandMatch: BrandOption | null;
-  catalogPrefill: ManualProductCatalogPrefill | null;
-  filteredBrandOptions: BrandOption[];
-  brandLoading: boolean;
-  canCreateBrand: boolean;
-  normalizedBrandSearch: string;
-  onUseTypedBrand: () => void;
+  manualDescription: string;
+  onManualDescriptionChange: (v: string) => void;
+  manualManufacturer: string;
+  onManualManufacturerChange: (v: string) => void;
   manualSku: string;
   onManualSkuChange: (v: string) => void;
   manualImageInputRef: RefObject<HTMLInputElement | null>;
@@ -36,20 +25,10 @@ export function ManualProductEntryIdentityFields({
   onManualEanChange,
   manualName,
   onManualNameChange,
-  brandBoxRef,
-  brandSearch,
-  onBrandSearchChange,
-  onPickBrand,
-  onBrandFocusOpen,
-  brandDropdownOpen,
-  selectedBrandImageUrl,
-  exactBrandMatch,
-  catalogPrefill,
-  filteredBrandOptions,
-  brandLoading,
-  canCreateBrand,
-  normalizedBrandSearch,
-  onUseTypedBrand,
+  manualDescription,
+  onManualDescriptionChange,
+  manualManufacturer,
+  onManualManufacturerChange,
   manualSku,
   onManualSkuChange,
   manualImageInputRef,
@@ -59,19 +38,18 @@ export function ManualProductEntryIdentityFields({
 }: ManualProductEntryIdentityFieldsProps) {
   return (
     <div className="mb-6 grid max-w-3xl gap-3 sm:grid-cols-2">
+      {/* Row 1: EAN + Nome */}
       <div className="sm:col-span-2">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">EAN · UDI · HIBC</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={manualEan}
-                onChange={(e) => onManualEanChange(e.target.value)}
-                placeholder="Inserisci codice"
-                className="h-9 w-full rounded-md border border-slate-200 px-3 pr-10 text-sm text-slate-600"
-              />
-            </div>
+            <input
+              type="text"
+              value={manualEan}
+              onChange={(e) => onManualEanChange(e.target.value)}
+              placeholder="Inserisci codice"
+              className="h-9 w-full rounded-md border border-slate-200 px-3 text-sm text-slate-600"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">Nome prodotto *</label>
@@ -85,75 +63,31 @@ export function ManualProductEntryIdentityFields({
           </div>
         </div>
       </div>
+
+      {/* Row 2: Descrizione (full width) */}
+      <div className="sm:col-span-2">
+        <label className="mb-1 block text-xs font-medium text-slate-700">Descrizione</label>
+        <textarea
+          value={manualDescription}
+          onChange={(e) => onManualDescriptionChange(e.target.value)}
+          placeholder="Descrizione opzionale del prodotto"
+          rows={2}
+          className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600"
+        />
+      </div>
+
+      {/* Row 3: Produttore + SKU + immagine */}
       <div className="sm:col-span-2">
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-fit min-w-[220px]">
-            <label className="mb-1 block text-xs font-medium text-slate-700">Brand</label>
-            <div ref={brandBoxRef} className="relative">
-              {selectedBrandImageUrl ? (
-                <img
-                  src={selectedBrandImageUrl}
-                  alt={exactBrandMatch?.name ?? catalogPrefill?.brand ?? "Brand selezionato"}
-                  className="pointer-events-none absolute left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-sm border border-slate-200 object-cover"
-                  loading="eager"
-                />
-              ) : null}
-              <input
-                type="text"
-                value={brandSearch}
-                onChange={(e) => {
-                  onBrandSearchChange(e.target.value);
-                }}
-                onFocus={onBrandFocusOpen}
-                placeholder="Cerca o aggiungi brand"
-                className={`h-9 w-fit rounded-md border border-slate-200 px-3 text-sm text-slate-600 ${
-                  selectedBrandImageUrl ? "pl-9" : ""
-                }`}
-              />
-              {brandDropdownOpen ? (
-                <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                  <div className="max-h-44 overflow-y-auto py-1">
-                    {filteredBrandOptions.map((brand) => (
-                      <button
-                        key={brand.id}
-                        type="button"
-                        onClick={() => {
-                          onPickBrand(brand.name);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
-                      >
-                        {brand.image_url ? (
-                          <img
-                            src={brand.image_url}
-                            alt={brand.name}
-                            className="h-5 w-5 shrink-0 rounded-sm border border-slate-200 object-cover"
-                            loading="lazy"
-                          />
-                        ) : null}
-                        <span className="truncate">{brand.name}</span>
-                      </button>
-                    ))}
-                    {brandLoading ? (
-                      <div className="px-3 py-2 text-xs text-slate-500">Ricerca brand...</div>
-                    ) : null}
-                    {filteredBrandOptions.length === 0 && !canCreateBrand && !brandLoading ? (
-                      <div className="px-3 py-2 text-xs text-slate-500">Nessun brand trovato.</div>
-                    ) : null}
-                  </div>
-                  {canCreateBrand ? (
-                    <div className="border-t border-slate-100 p-1.5">
-                      <button
-                        type="button"
-                        onClick={onUseTypedBrand}
-                        className="w-full rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left text-xs font-normal text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-                      >
-                        {`Usa "${normalizedBrandSearch}"`}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Produttore</label>
+            <input
+              type="text"
+              value={manualManufacturer}
+              onChange={(e) => onManualManufacturerChange(e.target.value)}
+              placeholder="Nome produttore"
+              className="h-9 w-fit rounded-md border border-slate-200 px-3 text-sm text-slate-600"
+            />
           </div>
           <div className="min-w-[220px] flex-1">
             <label className="mb-1 block text-xs font-medium text-slate-700">SKU</label>

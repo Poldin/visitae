@@ -20,10 +20,13 @@ function getResolvedMode(selectedMode: SelectedMode, hasExistingProduct: boolean
   return hasExistingProduct ? "inventario" : "nuovo";
 }
 
-function getBrandFromMetadata(metadata: unknown): string | null {
+function getManufacturerFromMetadata(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
-  const raw = (metadata as { brand?: unknown }).brand;
-  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+  const raw = (metadata as { manufacturer?: unknown; brand?: unknown }).manufacturer;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  // Fallback: read legacy brand field for products created before the migration
+  const legacy = (metadata as { brand?: unknown }).brand;
+  return typeof legacy === "string" && legacy.trim() ? legacy.trim() : null;
 }
 
 function getSkuFromMetadata(metadata: unknown): string | null {
@@ -68,25 +71,23 @@ export async function GET(req: NextRequest) {
   if (!userData?.user?.id) return NextResponse.json({ error: "Sessione non valida." }, { status: 401 });
 
   if (source === "clinic") {
-    const [{ data: product, error: productErr }, { data: invRows, error: invErr }, { data: brandsData, error: brandsErr }] = await Promise.all([
+    const [{ data: product, error: productErr }, { data: invRows, error: invErr }] = await Promise.all([
       supabase
         .from("products")
-        .select("id,name,sku,ean,category,image_url,metadata")
+        .select("id,name,sku,ean,category,image_url,metadata,description")
         .eq("clinic_id", clinicId)
         .eq("id", itemId)
         .maybeSingle(),
       supabase.from("inventory_items").select("quantity").eq("clinic_id", clinicId).eq("product_id", itemId),
-      supabase.from("brands").select("name,image_url"),
     ]);
-    const firstErr = productErr ?? invErr ?? brandsErr;
+    const firstErr = productErr ?? invErr;
     if (firstErr) return NextResponse.json({ error: firstErr.message }, { status: 400 });
     if (!product) return NextResponse.json({ error: "Prodotto clinica non trovato." }, { status: 404 });
 
     const totalQty = (invRows ?? []).reduce((s, r) => s + Number((r as { quantity: number }).quantity ?? 0), 0);
-    const brand = getBrandFromMetadata(product.metadata) ?? product.category ?? null;
-    const brandImage =
-      (brandsData ?? []).find((b) => b.name?.trim().toLowerCase() === (brand ?? "").trim().toLowerCase())?.image_url ?? null;
+    const manufacturer = getManufacturerFromMetadata(product.metadata) ?? product.category ?? null;
     const resolvedMode = getResolvedMode(selectedMode, true);
+    const description = clean(product.description) || null;
     return NextResponse.json({
       resolvedMode,
       prefill: {
@@ -94,8 +95,8 @@ export async function GET(req: NextRequest) {
         existingProductId: product.id,
         currentStockQty: totalQty,
         name: product.name,
-        brand,
-        brandImageUrl: brandImage,
+        description,
+        manufacturer,
         sku: product.sku?.trim() || getSkuFromMetadata(product.metadata),
         ean: product.ean?.trim() || getEanFromMetadata(product.metadata),
         imageUrl: product.image_url,
@@ -108,22 +109,25 @@ export async function GET(req: NextRequest) {
   const [{ data: master, error: masterErr }, { data: existing, error: existingErr }, { data: invRows, error: invErr }] = await Promise.all([
     supabase
       .from("master_catalog")
-      .select("id,name,sku,ean,image_url,tags,default_min_stock,brand_id")
+      .select(
+        "id,name,sku,ean,image_url,tags,default_min_stock,default_description,manufacturer:manufacturer_id(full_legal_name)",
+      )
       .eq("id", itemId)
       .maybeSingle(),
     supabase
       .from("products")
-      .select("id,name,sku,ean,category,image_url,metadata")
+      .select("id,name,sku,ean,category,image_url,metadata,description")
       .eq("clinic_id", clinicId)
       .eq("master_catalogue_id", itemId)
       .maybeSingle(),
     supabase.from("inventory_items").select("quantity,product_id").eq("clinic_id", clinicId),
   ]);
-  const brandId = (master as any)?.brand_id as string | null | undefined;
-  const { data: brand } = brandId ? await supabase.from("brands").select("name,image_url").eq("id", brandId).maybeSingle() : { data: null };
   const firstErr = masterErr ?? existingErr ?? invErr;
   if (firstErr) return NextResponse.json({ error: firstErr.message }, { status: 400 });
   if (!master) return NextResponse.json({ error: "Articolo catalogo non trovato." }, { status: 404 });
+
+  const mfr = (master as unknown as { manufacturer: { full_legal_name: string | null } | null }).manufacturer;
+  const manufacturerName = mfr?.full_legal_name?.trim() ?? null;
 
   const hasExisting = Boolean(existing?.id);
   const resolvedMode = getResolvedMode(selectedMode, hasExisting);
@@ -134,6 +138,10 @@ export async function GET(req: NextRequest) {
           .reduce((s, r) => s + Number((r as { quantity: number }).quantity ?? 0), 0)
       : null;
 
+  const masterDesc = clean(master.default_description) || null;
+  const existingDesc = clean(existing?.description) || null;
+  const description = existingDesc || masterDesc;
+
   return NextResponse.json({
     resolvedMode,
     prefill: {
@@ -141,8 +149,8 @@ export async function GET(req: NextRequest) {
       existingProductId: existing?.id ?? null,
       currentStockQty: totalQty,
       name: existing?.name ?? master.name,
-      brand: brand?.name ?? existing?.category ?? null,
-      brandImageUrl: brand?.image_url ?? null,
+      description,
+      manufacturer: manufacturerName ?? getManufacturerFromMetadata(existing?.metadata) ?? existing?.category ?? null,
       sku: existing?.sku ?? master.sku,
       ean: existing?.ean ?? master.ean,
       imageUrl: existing?.image_url ?? master.image_url,

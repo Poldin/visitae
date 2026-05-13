@@ -19,10 +19,6 @@ type InventoryQtyRow = {
   quantity: number;
 };
 
-type BrandRow = {
-  name: string | null;
-  image_url: string | null;
-};
 
 type SearchMasterCatalogRow = Database["public"]["Functions"]["search_master_catalog"]["Returns"][number];
 
@@ -30,14 +26,14 @@ function clean(value: string | null | undefined): string {
   return (value ?? "").trim();
 }
 
-function lower(value: string | null | undefined): string {
-  return clean(value).toLowerCase();
-}
 
-function getBrandFromMetadata(metadata: unknown): string | null {
+function getManufacturerFromMetadata(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
-  const raw = (metadata as { brand?: unknown }).brand;
-  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+  const raw = (metadata as { manufacturer?: unknown; brand?: unknown }).manufacturer;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  // Fallback: legacy brand field for products created before the migration
+  const legacy = (metadata as { brand?: unknown }).brand;
+  return typeof legacy === "string" && legacy.trim() ? legacy.trim() : null;
 }
 
 function getSkuFromMetadata(metadata: unknown): string | null {
@@ -87,35 +83,27 @@ export async function GET(req: NextRequest) {
     productsQuery = productsQuery.or(`name.ilike.%${query}%,sku.ilike.%${query}%,ean.ilike.%${query}%,category.ilike.%${query}%`);
   }
 
-  const [{ data: productsData, error: productsErr }, { data: invData, error: invErr }, { data: brandsData, error: brandsErr }] =
+  const [{ data: productsData, error: productsErr }, { data: invData, error: invErr }] =
     await Promise.all([
       productsQuery,
       supabase.from("inventory_items").select("product_id,quantity").eq("clinic_id", clinicId),
-      supabase.from("brands").select("name,image_url"),
     ]);
 
-  const firstErr = productsErr ?? invErr ?? brandsErr;
+  const firstErr = productsErr ?? invErr;
   if (firstErr) return NextResponse.json({ error: firstErr.message }, { status: 400 });
 
   const qtyByProduct = new Map<string, number>();
   for (const row of (invData ?? []) as InventoryQtyRow[]) {
     qtyByProduct.set(row.product_id, (qtyByProduct.get(row.product_id) ?? 0) + Number(row.quantity ?? 0));
   }
-  const brandImageByName = new Map<string, string>();
-  for (const row of (brandsData ?? []) as BrandRow[]) {
-    const k = lower(row.name);
-    if (!k || !row.image_url) continue;
-    brandImageByName.set(k, row.image_url);
-  }
 
   const clinicProducts = ((productsData ?? []) as ProductRow[]).map((p) => {
-    const brand = getBrandFromMetadata(p.metadata) ?? p.category ?? null;
+    const manufacturer = getManufacturerFromMetadata(p.metadata) ?? p.category ?? null;
     return {
       id: p.id,
       name: p.name,
       sku: p.sku?.trim() || getSkuFromMetadata(p.metadata) || "",
-      brand,
-      brandImageUrl: brand ? brandImageByName.get(brand.toLowerCase()) ?? null : null,
+      manufacturer,
       imageUrl: p.image_url,
       totalQty: qtyByProduct.get(p.id) ?? 0,
       ean: p.ean?.trim() || getEanFromMetadata(p.metadata),
@@ -137,13 +125,12 @@ export async function GET(req: NextRequest) {
     id: m.id,
     name: m.name,
     tags: m.tags ?? null,
-    brand: m.brand ?? null,
-    brand_image_url: m.brand_image_url ?? null,
     sku: m.sku ?? null,
     ean: m.ean ?? null,
     image_url: m.image_url ?? null,
     default_min_stock: m.default_min_stock != null ? Number(m.default_min_stock) : null,
     manufacturer: m.manufacturer?.trim() ? m.manufacturer.trim() : null,
+    default_description: m.default_description?.trim() ? m.default_description.trim() : null,
   }));
 
   const hasMoreClinicProducts = (clinicProducts.length ?? 0) > clinicLimit;

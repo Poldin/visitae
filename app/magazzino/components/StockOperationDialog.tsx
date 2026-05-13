@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, ClipboardCheck, Plus, Search, X } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ClipboardCheck,
+  Factory,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import {
@@ -19,8 +27,7 @@ export type StockProductSummary = {
   id: string;
   name: string;
   sku: string;
-  brand: string | null;
-  brandImageUrl: string | null;
+  manufacturer: string | null;
   imageUrl: string | null;
   totalQty: number;
   ean: string | null;
@@ -30,13 +37,12 @@ type MasterCatalogItem = {
   id: string;
   name: string;
   tags: string[] | null;
-  brand: string | null;
-  brand_image_url: string | null;
   sku: string | null;
   ean: string | null;
   image_url: string | null;
   default_min_stock: number | string | null;
   manufacturer: string | null;
+  default_description: string | null;
 };
 
 type StockOperationDialogProps = {
@@ -169,13 +175,13 @@ export function StockOperationDialog({
   useEffect(() => {
     if (!open) return;
     const trimmed = productQuery.trim();
-    if (trimmed === "") {
+    if (trimmed === "" || trimmed.length < 3) {
       setDebouncedSearch("");
       return;
     }
     const timeout = window.setTimeout(() => {
       setDebouncedSearch(trimmed);
-    }, 300);
+    }, 400);
     return () => window.clearTimeout(timeout);
   }, [productQuery, open]);
 
@@ -456,6 +462,11 @@ export function StockOperationDialog({
               className="h-9 w-full rounded-md border border-slate-200 pl-8 pr-3 text-sm text-slate-600"
             />
           </div>
+          {productQuery.trim().length > 0 && productQuery.trim().length < 3 ? (
+            <p className="mt-2 text-center text-xs text-amber-600">
+              Digita almeno 3 caratteri per cercare nel catalogo.
+            </p>
+          ) : (
           <p className="mt-2 text-center text-xs text-slate-600">
             {mode === "nuovo"
               ? "Non trovi l'articolo che cercavi? "
@@ -474,6 +485,7 @@ export function StockOperationDialog({
             </button>
             .
           </p>
+          )}
         </div>
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
@@ -510,18 +522,8 @@ export function StockOperationDialog({
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
-                            {p.brand?.trim() ? (
-                              <div className="mt-0.5 flex items-center gap-2">
-                                {p.brandImageUrl ? (
-                                  <img
-                                    src={p.brandImageUrl}
-                                    alt={p.brand}
-                                    className="h-5 w-5 shrink-0 rounded-sm border border-emerald-200 object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : null}
-                                <p className="truncate text-xs text-slate-700">{p.brand}</p>
-                              </div>
+                            {p.manufacturer?.trim() ? (
+                              <p className="mt-0.5 truncate text-xs text-slate-600">{p.manufacturer}</p>
                             ) : null}
                             {(p.sku || p.ean) ? (
                               <p className="mt-1 text-[11px] text-emerald-900/70">
@@ -584,25 +586,27 @@ export function StockOperationDialog({
                             ) : null}
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-semibold text-slate-900">{item.name}</p>
-                              {item.brand?.trim() ? (
-                                <div className="mt-0.5 flex items-center gap-2">
-                                  {item.brand_image_url ? (
-                                    <img
-                                      src={item.brand_image_url}
-                                      alt={item.brand}
-                                      className="h-5 w-5 shrink-0 rounded-sm border border-slate-200 object-cover"
-                                      loading="lazy"
-                                    />
-                                  ) : null}
-                                  <p className="truncate text-xs text-slate-700">{item.brand}</p>
-                                </div>
+                              {item.default_description?.trim() ? (
+                                <p className="mt-1 line-clamp-2 text-[11px] text-slate-600">
+                                  {item.default_description.trim()}
+                                </p>
                               ) : null}
                               {(item.manufacturer?.trim() || item.ean) ? (
-                                <p className="mt-1 text-[11px] text-slate-500">
-                                  {item.manufacturer?.trim() ?? ""}
-                                  {item.manufacturer?.trim() && item.ean ? " • " : ""}
-                                  {item.ean ? `EAN: ${item.ean}` : ""}
-                                </p>
+                                <div className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-500">
+                                  {item.manufacturer?.trim() ? (
+                                    <Factory
+                                      size={12}
+                                      strokeWidth={1.25}
+                                      className="mt-0.5 shrink-0 text-slate-400"
+                                      aria-hidden
+                                    />
+                                  ) : null}
+                                  <p className="min-w-0 flex-1 leading-snug">
+                                    {item.manufacturer?.trim() ?? ""}
+                                    {item.manufacturer?.trim() && item.ean ? " • " : ""}
+                                    {item.ean ? `EAN: ${item.ean}` : ""}
+                                  </p>
+                                </div>
                               ) : null}
                             </div>
                           </div>

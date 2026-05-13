@@ -7,9 +7,10 @@ export type ManualProductCatalogPrefill = {
   /** Totale pezzi in giacenza al momento dell'apertura (solo da lista clinica). */
   currentStockQty: number | null;
   name: string;
-  brand: string | null;
-  /** Logo brand da mostrare subito nel campo (stesso dato usato in lista giacenza / card catalogo). */
-  brandImageUrl: string | null;
+  /** Da `products.description` o `master_catalog.default_description` quando si apre da StockOperationDialog / catalogo. */
+  description: string | null;
+  /** Nome produttore (da `manufacturers.full_legal_name` via master_catalog, o da metadata per prodotti manuali). */
+  manufacturer: string | null;
   sku: string | null;
   ean: string | null;
   imageUrl: string | null;
@@ -26,11 +27,6 @@ export type ManualProductEntryTitleIntent =
 /** Allineato ai pulsanti Carico / Scarico / Inventario / Nuovo articolo (pagina magazzino e StockOperationDialog). */
 export type ManualProductEntryHeaderMode = "carico" | "scarico" | "inventario" | "nuovo";
 
-export type BrandOption = {
-  id: string;
-  name: string;
-  image_url: string | null;
-};
 
 export type ManualLotRow = {
   id: string;

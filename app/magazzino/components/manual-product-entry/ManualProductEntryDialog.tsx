@@ -5,14 +5,13 @@ import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
-import { BRAND_DROPDOWN_LIMIT, intentToHeaderMode } from "./constants";
+import { intentToHeaderMode } from "./constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./format";
 import { ManualProductEntryHeader } from "./ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./ManualProductLotsSection";
 import { ProductHeroImageColumn } from "./ProductHeroImageColumn";
 import type {
-  BrandOption,
   ExistingInventoryLot,
   ManualLotRow,
   ManualProductEntryDialogProps,
@@ -38,11 +37,7 @@ export function ManualProductEntryDialog({
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [manualName, setManualName] = useState("");
-  const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
-  const [brandSearch, setBrandSearch] = useState("");
-  const [debouncedBrandSearch, setDebouncedBrandSearch] = useState("");
-  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
-  const [brandLoading, setBrandLoading] = useState(false);
+  const [manualManufacturer, setManualManufacturer] = useState("");
   const [manualSku, setManualSku] = useState("");
   const [manualEan, setManualEan] = useState("");
   const [manualDescription, setManualDescription] = useState("");
@@ -56,7 +51,6 @@ export function ManualProductEntryDialog({
   const [manualImageFile, setManualImageFile] = useState<File | null>(null);
   const [manualImagePreviewUrl, setManualImagePreviewUrl] = useState<string | null>(null);
   const manualImageInputRef = useRef<HTMLInputElement | null>(null);
-  const brandBoxRef = useRef<HTMLDivElement | null>(null);
   const modeDropdownRef = useRef<HTMLDivElement | null>(null);
   const defaultLots = useMemo(() => [{ id: "lot-1", quantity: "1", lotCode: "", price: "", vat: "", expiryDate: "", location: "" }], []);
   const prevOpenForAutosaveHydrationRef = useRef(false);
@@ -96,7 +90,6 @@ export function ManualProductEntryDialog({
     if (!open) return;
     setSaving(false);
     setSubmitError(null);
-    setManualDescription("");
     const m = intentToHeaderMode(titleIntent);
     if (m === "scarico" || m === "inventario") {
       setManualLots([]);
@@ -113,17 +106,15 @@ export function ManualProductEntryDialog({
     const p = catalogPrefill;
     if (p) {
       setManualName(p.name);
-      setBrandSearch(p.brand ?? "");
-      setDebouncedBrandSearch((p.brand ?? "").trim());
-      setBrandDropdownOpen(false);
+      setManualDescription((p.description ?? "").trim());
+      setManualManufacturer(p.manufacturer ?? "");
       setManualSku(p.sku ?? "");
       setManualEan(p.ean ?? "");
       setCatalogImageUrl(p.imageUrl);
     } else {
       setManualName("");
-      setBrandSearch("");
-      setDebouncedBrandSearch("");
-      setBrandDropdownOpen(false);
+      setManualDescription("");
+      setManualManufacturer("");
       setManualSku("");
       setManualEan("");
       setCatalogImageUrl(null);
@@ -254,82 +245,6 @@ export function ManualProductEntryDialog({
   }, [headerMode, defaultLots]);
 
   useEffect(() => {
-    if (!open) return;
-    const timeout = window.setTimeout(() => {
-      setDebouncedBrandSearch(brandSearch.trim());
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [brandSearch, open]);
-
-  const fetchBrandOptions = async (searchValue: string) => {
-    const supabase = getSupabaseAuthClient();
-    if (!supabase) {
-      setSubmitError("Configurazione Supabase mancante.");
-      return;
-    }
-    setBrandLoading(true);
-    setSubmitError(null);
-    let options: BrandOption[] = [];
-    if (searchValue) {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id,name,image_url")
-        .ilike("name", `%${searchValue}%`)
-        .order("name", { ascending: true })
-        .limit(BRAND_DROPDOWN_LIMIT);
-      if (error) {
-        setSubmitError(error.message);
-      } else {
-        options = (data ?? [])
-          .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
-          .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
-      }
-    } else {
-      const { count, error: countError } = await supabase
-        .from("brands")
-        .select("id", { count: "exact", head: true });
-      if (countError) {
-        setSubmitError(countError.message);
-      } else {
-        const safeCount = count ?? 0;
-        const maxOffset = Math.max(0, safeCount - BRAND_DROPDOWN_LIMIT);
-        const randomOffset = maxOffset > 0 ? Math.floor(Math.random() * (maxOffset + 1)) : 0;
-        const { data, error } = await supabase
-          .from("brands")
-          .select("id,name,image_url")
-          .order("name", { ascending: true })
-          .range(randomOffset, randomOffset + BRAND_DROPDOWN_LIMIT - 1);
-        if (error) {
-          setSubmitError(error.message);
-        } else {
-          options = (data ?? [])
-            .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
-            .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
-        }
-      }
-    }
-    setBrandOptions(options);
-    setBrandLoading(false);
-  };
-
-  useEffect(() => {
-    if (!open || !brandDropdownOpen) return;
-    void fetchBrandOptions(debouncedBrandSearch);
-  }, [open, brandDropdownOpen, debouncedBrandSearch]);
-
-  useEffect(() => {
-    if (!brandDropdownOpen) return;
-    const onClickOutside = (event: MouseEvent) => {
-      if (!brandBoxRef.current) return;
-      if (!brandBoxRef.current.contains(event.target as Node)) {
-        setBrandDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [brandDropdownOpen]);
-
-  useEffect(() => {
     if (!modeDropdownOpen) return;
     const onClickOutside = (event: MouseEvent) => {
       if (!modeDropdownRef.current) return;
@@ -365,28 +280,6 @@ export function ManualProductEntryDialog({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose, modeDropdownOpen]);
-
-  const normalizedBrandSearch = brandSearch.trim();
-  const exactBrandMatch = useMemo(
-    () => brandOptions.find((b) => b.name.trim().toLowerCase() === normalizedBrandSearch.toLowerCase()) ?? null,
-    [brandOptions, normalizedBrandSearch],
-  );
-  const filteredBrandOptions = useMemo(() => brandOptions.slice(0, BRAND_DROPDOWN_LIMIT), [brandOptions]);
-  const canCreateBrand = Boolean(normalizedBrandSearch) && !exactBrandMatch;
-  const selectedBrandImageUrl = useMemo(() => {
-    if (exactBrandMatch?.image_url) return exactBrandMatch.image_url;
-    const pre = catalogPrefill;
-    const preBrand = pre?.brand?.trim().toLowerCase();
-    if (
-      pre &&
-      preBrand &&
-      preBrand === normalizedBrandSearch.toLowerCase() &&
-      pre.brandImageUrl
-    ) {
-      return pre.brandImageUrl;
-    }
-    return null;
-  }, [exactBrandMatch, catalogPrefill, normalizedBrandSearch]);
 
   const productHeroImageUrl = useMemo(() => {
     if (!open) return null;
@@ -432,8 +325,7 @@ export function ManualProductEntryDialog({
     productId: autosaveProductId,
     hydrationKey: `${autosaveHydrationKey}|${autosaveProductId ?? ""}`,
     manualName,
-    normalizedBrandSearch,
-    exactBrandMatch,
+    manualManufacturer,
     manualSku,
     manualEan,
     manualDescription,
@@ -697,7 +589,7 @@ export function ManualProductEntryDialog({
       productId: catalogPrefill?.existingProductId ?? undefined,
       masterCatalogueId: catalogPrefill?.masterCatalogueId ?? null,
       name: manualName.trim(),
-      brand: normalizedBrandSearch || null,
+      manufacturer: manualManufacturer.trim() || null,
       sku: manualSku.trim() || null,
       ean: manualEan.trim() || null,
       description: manualDescription.trim() || null,
@@ -825,13 +717,13 @@ export function ManualProductEntryDialog({
       setSubmitError("Prodotto gia presente nel tuo magazzino.");
       return null;
     }
-    const manualBrandName = normalizedBrandSearch || null;
+    const manufacturerValue = manualManufacturer.trim() || null;
     const manualSkuValue = manualSku.trim() || null;
     const manualEanValue = manualEan.trim() || null;
     const metadata =
-      manualBrandName || manualSkuValue || manualEanValue
+      manufacturerValue || manualSkuValue || manualEanValue
         ? {
-            ...(manualBrandName ? { brand: manualBrandName } : {}),
+            ...(manufacturerValue ? { manufacturer: manufacturerValue } : {}),
             ...(manualSkuValue ? { sku: manualSkuValue } : {}),
             ...(manualEanValue ? { ean: manualEanValue } : {}),
           }
@@ -851,8 +743,8 @@ export function ManualProductEntryDialog({
     const min_stock_level = Number.isFinite(minStockRaw) ? minStockRaw : 0;
 
     const categoryValue =
-      normalizedBrandSearch.trim() ||
-      catalogPrefill?.brand ||
+      manufacturerValue ||
+      catalogPrefill?.manufacturer ||
       catalogPrefill?.tags?.[0] ||
       null;
 
@@ -1025,11 +917,6 @@ export function ManualProductEntryDialog({
     }
   };
 
-  const handleUseTypedBrand = () => {
-    if (!normalizedBrandSearch) return;
-    setBrandSearch(normalizedBrandSearch);
-    setBrandDropdownOpen(false);
-  };
 
   if (!overlayMounted) return null;
 
@@ -1071,26 +958,10 @@ export function ManualProductEntryDialog({
             onManualEanChange={setManualEan}
             manualName={manualName}
             onManualNameChange={setManualName}
-            brandBoxRef={brandBoxRef}
-            brandSearch={brandSearch}
-            onBrandSearchChange={(v) => {
-              setBrandSearch(v);
-              setBrandDropdownOpen(true);
-            }}
-            onPickBrand={(name) => {
-              setBrandSearch(name);
-              setBrandDropdownOpen(false);
-            }}
-            onBrandFocusOpen={() => setBrandDropdownOpen(true)}
-            brandDropdownOpen={brandDropdownOpen}
-            selectedBrandImageUrl={selectedBrandImageUrl}
-            exactBrandMatch={exactBrandMatch}
-            catalogPrefill={catalogPrefill}
-            filteredBrandOptions={filteredBrandOptions}
-            brandLoading={brandLoading}
-            canCreateBrand={canCreateBrand}
-            normalizedBrandSearch={normalizedBrandSearch}
-            onUseTypedBrand={handleUseTypedBrand}
+            manualDescription={manualDescription}
+            onManualDescriptionChange={setManualDescription}
+            manualManufacturer={manualManufacturer}
+            onManualManufacturerChange={setManualManufacturer}
             manualSku={manualSku}
             onManualSkuChange={setManualSku}
             manualImageInputRef={manualImageInputRef}

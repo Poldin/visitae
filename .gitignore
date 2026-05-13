@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite locale (import_confezioni_AIFA_aic.py / import_dm_rdm_csv.py)
+/data/*.sqlite
+/data/*.sqlite-shm
+/data/*.sqlite-wal

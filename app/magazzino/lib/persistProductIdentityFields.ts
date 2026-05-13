@@ -1,16 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { splitProductIdentifierForInsert } from "@/app/magazzino/lib/productIdentifierColumns";
-import type { BrandOption } from "@/app/magazzino/components/manual-product-entry/types";
 import type { Database, Json } from "@/lib/supabase.types";
 
 function mergeIdentityMetadata(
   prev: Json | undefined,
-  patch: { brandLabel: string | null; sku: string | null; metadataEan: string | null },
+  patch: { manufacturerLabel: string | null; sku: string | null; metadataEan: string | null },
 ): Record<string, unknown> {
   const base =
     prev != null && typeof prev === "object" && !Array.isArray(prev) ? { ...(prev as Record<string, unknown>) } : {};
-  if (patch.brandLabel) base.brand = patch.brandLabel;
-  else delete base.brand;
+  if (patch.manufacturerLabel) base.manufacturer = patch.manufacturerLabel;
+  else delete base.manufacturer;
   if (patch.sku) base.sku = patch.sku;
   else delete base.sku;
   if (patch.metadataEan) base.ean = patch.metadataEan;
@@ -24,8 +23,7 @@ export async function persistProductIdentityFields(
     clinicId: string;
     productId: string;
     name: string;
-    normalizedBrandSearch: string;
-    exactBrandMatch: BrandOption | null;
+    manualManufacturer: string;
     manualSku: string;
     manualEan: string;
     manualDescription: string;
@@ -35,14 +33,7 @@ export async function persistProductIdentityFields(
   const name = args.name.trim();
   if (!name) return { error: null, skipped: true };
 
-  const brandLabel = args.normalizedBrandSearch.trim() || null;
-  const resolvedBrandId =
-    args.exactBrandMatch &&
-    brandLabel &&
-    args.exactBrandMatch.name.trim().toLowerCase() === brandLabel.toLowerCase()
-      ? args.exactBrandMatch.id
-      : null;
-
+  const manufacturerLabel = args.manualManufacturer.trim() || null;
   const skuValRaw = args.manualSku.trim();
   const skuColumn = skuValRaw.length ? skuValRaw : null;
 
@@ -59,7 +50,7 @@ export async function persistProductIdentityFields(
   if (readErr) return { error: readErr.message };
 
   const metadataMerged = mergeIdentityMetadata(row?.metadata ?? undefined, {
-    brandLabel,
+    manufacturerLabel,
     sku: skuColumn,
     metadataEan,
   });
@@ -68,8 +59,7 @@ export async function persistProductIdentityFields(
 
   const patch: Database["public"]["Tables"]["products"]["Update"] = {
     name,
-    category: brandLabel,
-    brand_id: resolvedBrandId,
+    category: manufacturerLabel,
     sku: skuColumn,
     ean,
     udi_di,

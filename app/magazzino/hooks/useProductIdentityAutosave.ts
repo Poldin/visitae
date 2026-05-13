@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
-import type { BrandOption } from "@/app/magazzino/components/manual-product-entry/types";
 import {
   persistProductIdentityFields,
   uploadManualProductIdentityImage,
@@ -20,8 +19,7 @@ export function useProductIdentityAutosave(opts: {
   hydrationKey?: string | null;
 
   manualName: string;
-  normalizedBrandSearch: string;
-  exactBrandMatch: BrandOption | null;
+  manualManufacturer: string;
   manualSku: string;
   manualEan: string;
   manualDescription: string;
@@ -41,8 +39,7 @@ export function useProductIdentityAutosave(opts: {
     debounceMs = 450,
     hydrationKey = null,
     manualName,
-    normalizedBrandSearch,
-    exactBrandMatch,
+    manualManufacturer,
     manualSku,
     manualEan,
     manualDescription,
@@ -64,8 +61,7 @@ export function useProductIdentityAutosave(opts: {
     ): string =>
       JSON.stringify({
         name: manualName.trim(),
-        brand: normalizedBrandSearch.trim(),
-        bid: exactBrandMatch?.id ?? null,
+        manufacturer: manualManufacturer.trim(),
         sku: manualSku.trim(),
         ean: manualEan.trim(),
         desc: manualDescription.trim(),
@@ -75,7 +71,7 @@ export function useProductIdentityAutosave(opts: {
           (catalog ?? "").trim() ||
           "",
       }),
-    [manualName, normalizedBrandSearch, exactBrandMatch, manualSku, manualEan, manualDescription],
+    [manualName, manualManufacturer, manualSku, manualEan, manualDescription],
   );
 
   useEffect(() => {
@@ -99,18 +95,11 @@ export function useProductIdentityAutosave(opts: {
         const nowKey = snapshotKeyWithImage(uploadedManualImageUrl, catalogImageUrl);
         if (nowKey !== pendingKey || nowKey === lastKnownGoodKeyRef.current) return;
 
-        const brandLabel = normalizedBrandSearch.trim();
-        const resolvedMatch: BrandOption | null =
-          exactBrandMatch && brandLabel && exactBrandMatch.name.trim().toLowerCase() === brandLabel.toLowerCase()
-            ? exactBrandMatch
-            : null;
-
         const res = await persistProductIdentityFields(supabase, {
           clinicId,
           productId,
           name: manualName,
-          normalizedBrandSearch,
-          exactBrandMatch: resolvedMatch,
+          manualManufacturer,
           manualSku,
           manualEan,
           manualDescription,
@@ -139,8 +128,7 @@ export function useProductIdentityAutosave(opts: {
     hydrationKey,
     snapshotKeyWithImage,
     manualName,
-    normalizedBrandSearch,
-    exactBrandMatch,
+    manualManufacturer,
     manualSku,
     manualEan,
     manualDescription,
@@ -166,18 +154,11 @@ export function useProductIdentityAutosave(opts: {
         return;
       }
 
-      const brandLabel = normalizedBrandSearch.trim();
-      const resolvedMatch: BrandOption | null =
-        exactBrandMatch && brandLabel && exactBrandMatch.name.trim().toLowerCase() === brandLabel.toLowerCase()
-          ? exactBrandMatch
-          : null;
-
       const res = await persistProductIdentityFields(supabase, {
         clinicId,
         productId,
         name: manualName,
-        normalizedBrandSearch,
-        exactBrandMatch: resolvedMatch,
+        manualManufacturer,
         manualSku,
         manualEan,
         manualDescription,
@@ -206,8 +187,7 @@ export function useProductIdentityAutosave(opts: {
     manualImageFile,
     snapshotKeyWithImage,
     manualName,
-    normalizedBrandSearch,
-    exactBrandMatch,
+    manualManufacturer,
     manualSku,
     manualEan,
     manualDescription,

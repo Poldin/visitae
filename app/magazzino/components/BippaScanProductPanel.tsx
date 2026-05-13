@@ -4,19 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseAuthClient } from "@/lib/supabaseAuthClient";
 import { buildScaricoNotes, DEFAULT_SCARICO_REASON_ID } from "@/app/magazzino/lib/scaricoNotes";
 import { finalizeInventoryLocationForApi } from "@/lib/inventoryLocation";
-import {
-  lookupBrandLogoByLabel,
-  resolveProductBrandLabel,
-} from "@/app/magazzino/lib/productBrandDisplay";
 import { useProductIdentityAutosave } from "@/app/magazzino/hooks/useProductIdentityAutosave";
-import { BRAND_DROPDOWN_LIMIT } from "./manual-product-entry/constants";
 import { inventoryUnitPriceFromDb, inventoryVatFromDb, parseLotPriceUi, parseLotVatUi } from "./manual-product-entry/format";
 import { ManualProductEntryHeader } from "./manual-product-entry/ManualProductEntryHeader";
 import { ManualProductEntryIdentityFields } from "./manual-product-entry/ManualProductEntryIdentityFields";
 import { ManualProductLotsSection } from "./manual-product-entry/ManualProductLotsSection";
 import { ProductHeroImageColumn } from "./manual-product-entry/ProductHeroImageColumn";
 import type {
-  BrandOption,
   ExistingInventoryLot,
   ManualLotRow,
   ManualProductCatalogPrefill,
@@ -91,11 +85,7 @@ export function BippaScanProductPanel({
 
   // New-product form state
   const [manualName, setManualName] = useState("");
-  const [brandSearch, setBrandSearch] = useState("");
-  const [debouncedBrandSearch, setDebouncedBrandSearch] = useState("");
-  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
-  const [brandLoading, setBrandLoading] = useState(false);
-  const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
+  const [manualManufacturer, setManualManufacturer] = useState("");
   const [manualSku, setManualSku] = useState("");
   const [manualEan, setManualEan] = useState("");
   const [manualDescription, setManualDescription] = useState("");
@@ -103,7 +93,6 @@ export function BippaScanProductPanel({
   const [manualImagePreviewUrl, setManualImagePreviewUrl] = useState<string | null>(null);
   const [catalogImageUrl, setCatalogImageUrl] = useState<string | null>(null);
 
-  const brandBoxRef = useRef<HTMLDivElement | null>(null);
   const modeDropdownRef = useRef<HTMLDivElement | null>(null);
   const manualImageInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -134,26 +123,21 @@ export function BippaScanProductPanel({
       // 1. Search products table (clinic's own inventory)
       const { data: product } = await supabase
         .from("products")
-        .select("id, name, ean, sku, image_url, description, metadata, category, brand:brand_id(name, image_url)")
+        .select("id, name, ean, sku, image_url, description, metadata, category")
         .eq("clinic_id", clinicId)
         .or(`ean.eq.${scannedCode},udi_di.eq.${scannedCode},hibc_primary.eq.${scannedCode}`)
         .maybeSingle();
 
       if (product) {
-        const brand = product.brand as { name: string; image_url: string | null } | null;
-        const brandLabel = resolveProductBrandLabel({
-          metadata: product.metadata,
-          category: product.category as string | null | undefined,
-          joinedBrand: brand ?? undefined,
-        });
-        let brandImageUrlResolved = (brand?.image_url ?? null) as string | null;
-        if (!brandImageUrlResolved && brandLabel.trim()) {
-          brandImageUrlResolved = await lookupBrandLogoByLabel(supabase, brandLabel);
-        }
+        const meta = product.metadata as Record<string, unknown> | null;
+        const manufacturerLabel =
+          (typeof meta?.manufacturer === "string" ? meta.manufacturer.trim() : null) ||
+          (typeof meta?.brand === "string" ? meta.brand.trim() : null) ||
+          (product.category as string | null | undefined)?.trim() ||
+          "";
 
         setManualName(product.name as string);
-        setBrandSearch(brandLabel);
-        setDebouncedBrandSearch(brandLabel.trim());
+        setManualManufacturer(manufacturerLabel);
         setManualSku((product.sku as string | null) ?? "");
         setManualEan((product.ean as string | null) ?? scannedCode);
         setCatalogImageUrl((product.image_url as string | null) ?? null);
@@ -162,8 +146,8 @@ export function BippaScanProductPanel({
           state: "found_product",
           productId: product.id as string,
           name: product.name as string,
-          brandName: brandLabel.trim() ? brandLabel.trim() : null,
-          brandImageUrl: brandImageUrlResolved,
+          brandName: manufacturerLabel || null,
+          brandImageUrl: null,
           ean: product.ean as string | null,
           sku: product.sku as string | null,
           imageUrl: product.image_url as string | null,
@@ -176,19 +160,23 @@ export function BippaScanProductPanel({
       // 2. Search master_catalog
       const { data: masterItem } = await supabase
         .from("master_catalog")
-        .select("id, name, ean, sku, image_url, default_min_stock, tags, brand:brand_id(name, image_url)")
+        .select(
+          "id, name, ean, sku, image_url, default_min_stock, default_description, tags, manufacturer:manufacturer_id(full_legal_name)",
+        )
         .or(`ean.eq.${scannedCode},udi_di.eq.${scannedCode},hibc_primary.eq.${scannedCode}`)
         .maybeSingle();
 
       if (masterItem) {
-        const brand = masterItem.brand as { name: string; image_url: string | null } | null;
+        const mfr = masterItem.manufacturer as { full_legal_name: string | null } | null;
+        const manufacturerName = mfr?.full_legal_name?.trim() ?? null;
+        const defaultDesc = ((masterItem.default_description as string | null) ?? "").trim();
         const prefill: ManualProductCatalogPrefill = {
           masterCatalogueId: masterItem.id as string,
           existingProductId: null,
           currentStockQty: null,
           name: masterItem.name as string,
-          brand: brand?.name ?? null,
-          brandImageUrl: brand?.image_url ?? null,
+          description: defaultDesc || null,
+          manufacturer: manufacturerName,
           sku: masterItem.sku as string | null,
           ean: (masterItem.ean as string | null) ?? scannedCode,
           imageUrl: masterItem.image_url as string | null,
@@ -196,11 +184,11 @@ export function BippaScanProductPanel({
           tags: masterItem.tags as string[] | null,
         };
         setManualName(masterItem.name as string);
-        setBrandSearch(brand?.name ?? "");
-        setDebouncedBrandSearch((brand?.name ?? "").trim());
+        setManualManufacturer(manufacturerName ?? "");
         setManualSku((masterItem.sku as string | null) ?? "");
         setManualEan((masterItem.ean as string | null) ?? scannedCode);
         setCatalogImageUrl(masterItem.image_url as string | null);
+        setManualDescription(defaultDesc);
         setLookup({ state: "new", prefill });
         setHeaderMode("nuovo");
         return;
@@ -209,8 +197,7 @@ export function BippaScanProductPanel({
       // 3. Not found anywhere — blank new product with EAN pre-filled
       setManualEan(scannedCode);
       setManualName("");
-      setBrandSearch("");
-      setDebouncedBrandSearch("");
+      setManualManufacturer("");
       setManualSku("");
       setCatalogImageUrl(null);
       setLookup({ state: "new", prefill: null });
@@ -308,77 +295,6 @@ export function BippaScanProductPanel({
     setManualLots([makeDefaultLot()]);
   }, [headerMode]);
 
-  // ── Brand dropdown (stessa UX di ManualProductEntryDialog) ────────────────
-
-  useEffect(() => {
-    if (lookup.state === "loading") return;
-    const timeout = window.setTimeout(() => setDebouncedBrandSearch(brandSearch.trim()), 250);
-    return () => window.clearTimeout(timeout);
-  }, [brandSearch, lookup.state]);
-
-  const fetchBrandOptions = useCallback(async (searchValue: string) => {
-    const supabase = getSupabaseAuthClient();
-    if (!supabase) {
-      setSubmitError("Configurazione Supabase mancante.");
-      return;
-    }
-    setBrandLoading(true);
-    setSubmitError(null);
-    let options: BrandOption[] = [];
-    if (searchValue) {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id,name,image_url")
-        .ilike("name", `%${searchValue}%`)
-        .order("name", { ascending: true })
-        .limit(BRAND_DROPDOWN_LIMIT);
-      if (error) {
-        setSubmitError(error.message);
-      } else {
-        options = (data ?? [])
-          .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
-          .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
-      }
-    } else {
-      const { count, error: countError } = await supabase.from("brands").select("id", { count: "exact", head: true });
-      if (countError) {
-        setSubmitError(countError.message);
-      } else {
-        const safeCount = count ?? 0;
-        const maxOffset = Math.max(0, safeCount - BRAND_DROPDOWN_LIMIT);
-        const randomOffset = maxOffset > 0 ? Math.floor(Math.random() * (maxOffset + 1)) : 0;
-        const { data, error } = await supabase
-          .from("brands")
-          .select("id,name,image_url")
-          .order("name", { ascending: true })
-          .range(randomOffset, randomOffset + BRAND_DROPDOWN_LIMIT - 1);
-        if (error) {
-          setSubmitError(error.message);
-        } else {
-          options = (data ?? [])
-            .filter((item): item is { id: string; name: string; image_url: string | null } => Boolean(item?.id && item?.name))
-            .map((item) => ({ id: item.id, name: item.name, image_url: item.image_url ?? null }));
-        }
-      }
-    }
-    setBrandOptions(options);
-    setBrandLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (lookup.state === "loading" || !brandDropdownOpen) return;
-    void fetchBrandOptions(debouncedBrandSearch);
-  }, [lookup.state, brandDropdownOpen, debouncedBrandSearch, fetchBrandOptions]);
-
-  useEffect(() => {
-    if (!brandDropdownOpen) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (!brandBoxRef.current?.contains(e.target as Node)) setBrandDropdownOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [brandDropdownOpen]);
-
   useEffect(() => {
     if (!modeDropdownOpen) return;
     const onClickOutside = (e: MouseEvent) => {
@@ -400,39 +316,10 @@ export function BippaScanProductPanel({
 
   // ── Derived values ──────────────────────────────────────────────────────────
 
-  const normalizedBrandSearch = brandSearch.trim();
-  const exactBrandMatch = useMemo(
-    () =>
-      brandOptions.find((b) => b.name.trim().toLowerCase() === normalizedBrandSearch.toLowerCase()) ?? null,
-    [brandOptions, normalizedBrandSearch],
-  );
-  const filteredBrandOptions = useMemo(() => brandOptions.slice(0, BRAND_DROPDOWN_LIMIT), [brandOptions]);
-  const canCreateBrand = Boolean(normalizedBrandSearch) && !exactBrandMatch;
-
   const catalogPrefill: ManualProductCatalogPrefill | null = useMemo(() => {
     if (lookup.state === "new") return lookup.prefill;
     return null;
   }, [lookup]);
-
-  const selectedBrandImageUrl = useMemo(() => {
-    if (exactBrandMatch?.image_url) return exactBrandMatch.image_url;
-    const pre =
-      lookup.state === "found_product"
-        ? { brand: lookup.brandName, brandImageUrl: lookup.brandImageUrl }
-        : catalogPrefill
-          ? { brand: catalogPrefill.brand, brandImageUrl: catalogPrefill.brandImageUrl }
-          : null;
-    const preBrand = pre?.brand?.trim().toLowerCase();
-    if (
-      pre &&
-      preBrand &&
-      preBrand === normalizedBrandSearch.toLowerCase() &&
-      pre.brandImageUrl
-    ) {
-      return pre.brandImageUrl;
-    }
-    return null;
-  }, [exactBrandMatch, lookup, catalogPrefill, normalizedBrandSearch]);
 
   const productHeroImageUrl = useMemo(() => {
     if (lookup.state === "loading") return null;
@@ -509,8 +396,7 @@ export function BippaScanProductPanel({
     productId: autosaveProductId,
     hydrationKey: `${scannedCode}|${autosaveProductId ?? ""}`,
     manualName,
-    normalizedBrandSearch,
-    exactBrandMatch,
+    manualManufacturer,
     manualSku,
     manualEan,
     manualDescription,
@@ -521,12 +407,6 @@ export function BippaScanProductPanel({
     onPersistError: onAutosavePersistError,
     onAutosaveApplied: onAutosaveEcho,
   });
-
-  const handleUseTypedBrand = useCallback(() => {
-    if (!normalizedBrandSearch) return;
-    setBrandSearch(normalizedBrandSearch);
-    setBrandDropdownOpen(false);
-  }, [normalizedBrandSearch]);
 
   // ── API calls (same logic as ManualProductEntryDialog) ─────────────────────
 
@@ -661,7 +541,7 @@ export function BippaScanProductPanel({
             productId: catalogPrefill?.existingProductId ?? undefined,
             masterCatalogueId: catalogPrefill?.masterCatalogueId ?? null,
             name: manualName.trim(),
-            brand: normalizedBrandSearch || null,
+            manufacturer: manualManufacturer.trim() || null,
             sku: manualSku.trim() || null,
             ean: manualEan.trim() || null,
             description: manualDescription.trim() || null,
@@ -689,7 +569,7 @@ export function BippaScanProductPanel({
       setSubmitError("Risposta API senza ID prodotto.");
       return null;
     },
-    [clinicId, uploadedManualImageUrl, manualImageFile, catalogImageUrl, catalogPrefill, uploadManualImage, manualName, normalizedBrandSearch, manualSku, manualEan, manualDescription],
+    [clinicId, uploadedManualImageUrl, manualImageFile, catalogImageUrl, catalogPrefill, uploadManualImage, manualName, manualManufacturer, manualSku, manualEan, manualDescription],
   );
 
   const ensureManualProduct = useCallback(async (): Promise<string | null> => {
@@ -721,11 +601,11 @@ export function BippaScanProductPanel({
       return null;
     }
 
-    const manualBrandName = normalizedBrandSearch || null;
+    const manufacturerValue = manualManufacturer.trim() || null;
     const metadata =
-      manualBrandName || manualSku.trim() || manualEan.trim()
+      manufacturerValue || manualSku.trim() || manualEan.trim()
         ? {
-            ...(manualBrandName ? { brand: manualBrandName } : {}),
+            ...(manufacturerValue ? { manufacturer: manufacturerValue } : {}),
             ...(manualSku.trim() ? { sku: manualSku.trim() } : {}),
             ...(manualEan.trim() ? { ean: manualEan.trim() } : {}),
           }
@@ -742,7 +622,7 @@ export function BippaScanProductPanel({
 
     const minStockRaw = catalogPrefill?.defaultMinStock != null ? Number(catalogPrefill.defaultMinStock) : 0;
     const min_stock_level = Number.isFinite(minStockRaw) ? minStockRaw : 0;
-    const categoryValue = normalizedBrandSearch.trim() || catalogPrefill?.brand || catalogPrefill?.tags?.[0] || null;
+    const categoryValue = manufacturerValue || catalogPrefill?.manufacturer || catalogPrefill?.tags?.[0] || null;
 
     setSaving(true);
     setSubmitError(null);
@@ -768,7 +648,7 @@ export function BippaScanProductPanel({
     setManualCreatedProductId(created.id);
     await onCreated();
     return created.id;
-  }, [clinicId, manualCreatedProductId, catalogPrefill, manualName, existingNameSet, normalizedBrandSearch, manualSku, manualEan, uploadedManualImageUrl, manualImageFile, catalogImageUrl, uploadManualImage, onCreated, manualDescription]);
+  }, [clinicId, manualCreatedProductId, catalogPrefill, manualName, existingNameSet, manualManufacturer, manualSku, manualEan, uploadedManualImageUrl, manualImageFile, catalogImageUrl, uploadManualImage, onCreated, manualDescription]);
 
   // ── Lot confirmation ────────────────────────────────────────────────────────
 
@@ -972,20 +852,10 @@ export function BippaScanProductPanel({
             onManualEanChange={setManualEan}
             manualName={manualName}
             onManualNameChange={setManualName}
-            brandBoxRef={brandBoxRef}
-            brandSearch={brandSearch}
-            onBrandSearchChange={(v) => { setBrandSearch(v); setBrandDropdownOpen(true); }}
-            onPickBrand={(name) => { setBrandSearch(name); setBrandDropdownOpen(false); }}
-            onBrandFocusOpen={() => setBrandDropdownOpen(true)}
-            brandDropdownOpen={brandDropdownOpen}
-            selectedBrandImageUrl={selectedBrandImageUrl}
-            exactBrandMatch={exactBrandMatch}
-            catalogPrefill={catalogPrefill}
-            filteredBrandOptions={filteredBrandOptions}
-            brandLoading={brandLoading}
-            canCreateBrand={canCreateBrand}
-            normalizedBrandSearch={normalizedBrandSearch}
-            onUseTypedBrand={handleUseTypedBrand}
+            manualDescription={manualDescription}
+            onManualDescriptionChange={setManualDescription}
+            manualManufacturer={manualManufacturer}
+            onManualManufacturerChange={setManualManufacturer}
             manualSku={manualSku}
             onManualSkuChange={setManualSku}
             manualImageInputRef={manualImageInputRef}
