@@ -155,7 +155,7 @@ export default async function Page() {
               </p>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-4xl font-semibold tabular-nums text-white md:text-5xl">
-                  €9
+                  €19
                 </span>
                 <span className="text-sm font-medium text-zinc-400">/mese</span>
               </div>
