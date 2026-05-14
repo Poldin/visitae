@@ -35,7 +35,7 @@ export default async function Page() {
           </div>
           <Link
             href="/login"
-            className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             Accedi
           </Link>
@@ -57,13 +57,13 @@ export default async function Page() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 Crea account gratuito
               </Link>
               <Link
                 href="/magazzino"
-                className="inline-flex items-center justify-center rounded-full border border-zinc-300 px-6 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="inline-flex items-center justify-center rounded-lg border border-zinc-300 px-6 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 Apri magazzino
               </Link>
@@ -97,7 +97,7 @@ export default async function Page() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
-            <article className="flex flex-col rounded-2xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900 md:p-8">
+            <article className="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900 md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
                 Piano Zero
               </p>
@@ -140,14 +140,14 @@ export default async function Page() {
               </ul>
               <Link
                 href="/login"
-                className="mt-8 inline-flex items-center justify-center rounded-full bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                className="mt-8 inline-flex items-center justify-center rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 Inizia gratis
               </Link>
             </article>
 
-            <article className="relative flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-100 md:p-8 dark:border-zinc-700 dark:bg-zinc-950">
-              <span className="absolute right-5 top-5 rounded-full border border-zinc-600/80 bg-zinc-800/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
+            <article className="relative flex flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 p-6 text-zinc-100 md:p-8 dark:border-zinc-700 dark:bg-zinc-950">
+              <span className="absolute right-5 top-5 rounded-lg border border-zinc-600/80 bg-zinc-800/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
                 Arriva presto
               </span>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
@@ -179,7 +179,7 @@ export default async function Page() {
               <button
                 type="button"
                 disabled
-                className="mt-8 inline-flex cursor-not-allowed items-center justify-center rounded-full bg-zinc-700 px-6 py-3 text-sm font-medium text-zinc-400 opacity-75 dark:bg-zinc-800 dark:text-zinc-500"
+                className="mt-8 inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-zinc-700 px-6 py-3 text-sm font-medium text-zinc-400 opacity-75 dark:bg-zinc-800 dark:text-zinc-500"
               >
                 Inizia con PRO
               </button>
@@ -233,7 +233,7 @@ export default async function Page() {
                 href="https://discord.gg/F8Bywfrqe"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4752C4]"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4752C4]"
               >
                 <svg
                   className="size-4.5 shrink-0"
