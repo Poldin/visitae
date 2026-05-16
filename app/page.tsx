@@ -3,6 +3,7 @@ import { getLandingBrands } from "@/lib/getLandingBrands";
 import LandingBrandsMarquee from "./components/LandingBrandsMarquee";
 import LandingBippaScannerSection from "./components/LandingBippaScannerSection";
 import LandingMagazzinoOperationsDemo from "./components/LandingMagazzinoOperationsDemo";
+import LandingStartNowSection from "./magazzino/components/landingStartNowSection";
 
 /** Ricarica i brand a ogni richiesta (evita homepage “graffiata senza marchi”). */
 export const dynamic = "force-dynamic";
@@ -72,6 +73,8 @@ export default async function Page() {
 
           <LandingMagazzinoOperationsDemo />
         </section>
+
+        <LandingStartNowSection />  
 
         <div
           aria-hidden="true"
