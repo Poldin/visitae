@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Download, Upload, Plus, Trash2, Copy, Check, ChevronDown, ChevronUp, Phone } from 'lucide-react';
 
-// 1. DEFINIAMO LE INTERFACCE PER LE PROPS DELL'EDITOR SPOSTATO FUORI
 interface Template {
   id: string;
   title: string;
@@ -22,7 +21,6 @@ interface EditorAreaProps {
   updateActiveTemplateText: (id: string, text: string) => void;
 }
 
-// 2. COMPONENTE EDITOR SPOSTATO FUORI
 const EditorArea = ({
   templateId,
   templates,
@@ -40,7 +38,6 @@ const EditorArea = ({
 
   return (
     <div className="space-y-6 pt-4 md:pt-0">
-      {/* TITOLO MESSAGGIO */}
       <div className="px-2 space-y-2">
         <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">Titolo Messaggio</label>
         <input 
@@ -51,9 +48,7 @@ const EditorArea = ({
         />
       </div>
 
-      {/* BARRA AZIONI: COPIA, INPUT TELEFONO E WHATSAPP */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-2">
-        {/* Tasto Copia */}
         <button 
           onClick={handleCopy}
           className={`text-sm flex flex-1 sm:flex-none items-center justify-center gap-2 px-2 py-2 rounded-lg transition-all ${copied && selectedId === templateId ? 'bg-gray-500 text-white' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
@@ -61,7 +56,6 @@ const EditorArea = ({
           {copied && selectedId === templateId ? <><Check size={14}/> Copiato!</> : <><Copy size={14}/> Copia testo</>}
         </button>
 
-        {/* Input Numero di Telefono */}
         <div className="flex-1 flex items-center relative">
           <Phone size={14} className="absolute left-3 text-gray-400" />
           <input 
@@ -73,7 +67,6 @@ const EditorArea = ({
           />
         </div>
 
-        {/* Tasto WhatsApp */}
         <button 
           onClick={handleWhatsApp}
           className="text-sm flex flex-1 sm:flex-none items-center justify-center gap-2 p-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all shadow-sm"
@@ -82,7 +75,6 @@ const EditorArea = ({
         </button>
       </div>
 
-      {/* EDITOR MESSAGGIO */}
       <div className="space-y-2">
         <div className="flex justify-between items-end px-2">
           <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest italic">Contenuto del messaggio</label>
@@ -98,7 +90,6 @@ const EditorArea = ({
   );
 };
 
-// 3. COMPONENTE PRINCIPALE
 export default function MioDottoreAssistant() {
   const [templates, setTemplates] = useState<Template[]>([
     { id: '1', title: 'Igiene', text: "Gentile [NOME], le ricordiamo l'appuntamento per l'igiene domani alle ore [ORA]. Porti con sé lo spazzolino." },
@@ -167,9 +158,10 @@ export default function MioDottoreAssistant() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen md:h-screen bg-white text-black font-sans md:overflow-hidden">
-      {/* HEADER: Ora scorre via in modo naturale su mobile */}
-      <header className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-4 border-b border-gray-100 md:border-none">
+    // FIX: su mobile niente h-screen né overflow-hidden — il layout cresce con il contenuto
+    // Su desktop (md:) si torna al layout fisso a schermo intero con scroll interno
+    <div className="flex flex-col w-full md:h-screen bg-white text-black font-sans md:overflow-hidden">
+      <header className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-4 border-b border-gray-100">
         <div>
           <h1 className="text-2xl font-black tracking-tighter">Messaggi standard</h1>
           <p className="text-sm md:text-md text-gray-400 mb-2">Crea e usa i tuoi messaggi standard per i pazienti: non perdi tempo e non fai errori di battitura. Usa il tasto ESPORTA per salvare i tuoi messaggi e il tasto CARICA per ripristinare l'elenco.</p>
@@ -180,11 +172,12 @@ export default function MioDottoreAssistant() {
         </div>
       </header>
 
-      {/* CONTENITORE PRINCIPALE: Rimossi i vincoli di altezza fissa per il mobile */}
-      <div className="flex flex-1 flex-col md:flex-row md:overflow-hidden">
-        {/* SIDEBAR / ACCORDION */}
-        <aside className="w-full md:w-80 border-r border-gray-100 flex flex-col bg-gray-50/50">
-          <div className="p-4 flex-1 md:overflow-y-auto space-y-2">
+      {/* FIX: su mobile niente flex-1 che forza altezza fissa — si usa auto */}
+      <div className="flex flex-col md:flex-row md:flex-1 md:overflow-hidden">
+
+        {/* SIDEBAR: su mobile scorre normalmente, su desktop ha overflow-y-auto interno */}
+        <aside className="w-full md:w-80 border-r border-gray-100 md:flex md:flex-col bg-gray-50/50">
+          <div className="p-4 md:flex-1 md:overflow-y-auto space-y-2">
             <p className="text-[10px] font-black text-gray-400 uppercase mb-4 px-2">I tuoi modelli</p>
             
             {templates.map(t => {
@@ -213,8 +206,8 @@ export default function MioDottoreAssistant() {
                     </div>
                   </button>
 
-                  {/* Contenuto Fisarmonica (Mobile) */}
-                  <div className={`md:hidden transition-all duration-200 overflow-hidden ${isSelected ? 'max-h-[1500px] opacity-100 my-2' : 'max-h-0 opacity-0'}`}>
+                  {/* Fisarmonica mobile: max-h alto abbastanza da contenere tutto senza troncare */}
+                  <div className={`md:hidden overflow-hidden transition-all duration-300 ${isSelected ? 'max-h-[2000px] opacity-100 my-2' : 'max-h-0 opacity-0'}`}>
                     <div className="p-2 bg-white rounded-lg border border-gray-100">
                       <EditorArea 
                         templateId={t.id}
@@ -240,8 +233,8 @@ export default function MioDottoreAssistant() {
           </div>
         </aside>
 
-        {/* MAIN AREA - DESKTOP */}
-        <main className="hidden md:block flex-1 overflow-y-auto p-6 md:p-2">
+        {/* MAIN AREA - solo desktop */}
+        <main className="hidden md:block flex-1 overflow-y-auto p-6 md:p-8">
           <div className="max-w-3xl mx-auto">
             <EditorArea 
               templateId={selectedId}
@@ -259,7 +252,7 @@ export default function MioDottoreAssistant() {
         </main>
       </div>
 
-      {/* MODAL IMPORT/EXPORT */}
+      {/* MODAL */}
       {showDataDialog && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg p-6 md:p-8 rounded-lg space-y-6 shadow-2xl">
