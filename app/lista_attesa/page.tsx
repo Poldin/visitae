@@ -22,7 +22,7 @@ interface EditorAreaProps {
   updateActiveTemplateText: (id: string, text: string) => void;
 }
 
-// 2. COMPONENTE EDITOR SPOSTATO FUORI (Risolve il problema del focus)
+// 2. COMPONENTE EDITOR SPOSTATO FUORI
 const EditorArea = ({
   templateId,
   templates,
@@ -167,12 +167,12 @@ export default function MioDottoreAssistant() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-white text-black font-sans md:overflow-hidden">
-      {/* HEADER */}
+    <div className="flex flex-col min-h-screen md:h-screen bg-white text-black font-sans md:overflow-hidden">
+      {/* HEADER: Ora scorre via in modo naturale su mobile */}
       <header className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-4 border-b border-gray-100 md:border-none">
         <div>
           <h1 className="text-2xl font-black tracking-tighter">Messaggi standard</h1>
-          <p className="text-sm md:text-md text-gray-400 mb-2">Crea e usa i tuoi messaggi standard per i pazienti: non perdi tempo e non fai errori di battitura.</p>
+          <p className="text-sm md:text-md text-gray-400 mb-2">Crea e usa i tuoi messaggi standard per i pazienti: non perdi tempo e non fai errori di battitura. Usa il tasto ESPORTA per salvare i tuoi messaggi e il tasto CARICA per ripristinare l'elenco.</p>
           <div className="flex gap-2">
             <button onClick={() => setShowDataDialog('import')} className="flex items-center gap-1 text-[10px] font-bold border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 uppercase"><Upload size={12}/> Carica</button>
             <button onClick={handleExport} className="flex items-center gap-1 text-[10px] font-bold border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 uppercase"><Download size={12}/> Esporta</button>
@@ -180,8 +180,9 @@ export default function MioDottoreAssistant() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-y-auto md:overflow-hidden flex-col md:flex-row">
-        {/* SIDEBAR (Desktop) & ACCORDION SYSTEM (Mobile) */}
+      {/* CONTENITORE PRINCIPALE: Rimossi i vincoli di altezza fissa per il mobile */}
+      <div className="flex flex-1 flex-col md:flex-row md:overflow-hidden">
+        {/* SIDEBAR / ACCORDION */}
         <aside className="w-full md:w-80 border-r border-gray-100 flex flex-col bg-gray-50/50">
           <div className="p-4 flex-1 md:overflow-y-auto space-y-2">
             <p className="text-[10px] font-black text-gray-400 uppercase mb-4 px-2">I tuoi modelli</p>
@@ -213,7 +214,7 @@ export default function MioDottoreAssistant() {
                   </button>
 
                   {/* Contenuto Fisarmonica (Mobile) */}
-                  <div className={`md:hidden transition-all duration-200 overflow-hidden ${isSelected ? 'max-h-[1200px] opacity-100 my-2' : 'max-h-0 opacity-0'}`}>
+                  <div className={`md:hidden transition-all duration-200 overflow-hidden ${isSelected ? 'max-h-[1500px] opacity-100 my-2' : 'max-h-0 opacity-0'}`}>
                     <div className="p-2 bg-white rounded-lg border border-gray-100">
                       <EditorArea 
                         templateId={t.id}
