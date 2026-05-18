@@ -251,8 +251,8 @@ export default function MioDottoreAssistant() {
 
       {/* FOOTER */}
       <footer className="shrink-0 border-t border-gray-100 px-4 py-3 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-1">
-        <p className="text-[11px] text-gray-400 font-medium">Messaggi Standard · MioDottore Assistant</p>
-        <p className="text-[11px] text-gray-300">I dati rimangono nel browser — nessun invio a server esterni.</p>
+        <p className="text-[11px] text-gray-400 font-medium">Messaggi Standard · Visitae</p>
+        <p className="text-[11px] text-gray-300">I dati rimangono nel browser — i tuoi dati sono protetti.</p>
       </footer>
 
       {/* MODAL */}
