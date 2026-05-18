@@ -126,7 +126,7 @@ export default function MioDottoreAssistant() {
         {/* SIDEBAR (Desktop) & ACCORDION SYSTEM (Mobile) */}
         <aside className="w-full md:w-80 border-r border-gray-100 flex flex-col bg-gray-50/50">
           <div className="p-4 flex-1 md:overflow-y-auto space-y-2">
-            <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest px-2">I tuoi modelli</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase mb-4 px-2">I tuoi modelli</p>
             
             {templates.map(t => {
               const isSelected = selectedId === t.id;
@@ -135,7 +135,7 @@ export default function MioDottoreAssistant() {
                   {/* Pulsante/Header del Modello */}
                   <button 
                     onClick={() => setSelectedId(isSelected ? "" : t.id)} // Su mobile permette anche di chiuderlo cliccando di nuovo
-                    className={`w-full text-left p-3 md:p-2 rounded-lg font-bold transition-all flex justify-between items-center group ${isSelected ? 'bg-zinc-900 text-white shadow-lg' : 'hover:bg-zinc-100 text-zinc-600'}`}
+                    className={`w-full text-left p-3 md:p-2 rounded-lg transition-all flex justify-between items-center group ${isSelected ? 'bg-zinc-900 text-white shadow-lg' : 'hover:bg-zinc-100 text-zinc-600'}`}
                   >
                     <span className="truncate pr-2">{t.title}</span>
                     <div className="flex items-center gap-2">
