@@ -2,7 +2,7 @@
  * Route pubblici (nessun redirect verso /login dalla proxy).
  * Aggiungi qui /privacy e /terms quando le pagine sono pronte.
  */
-export const PUBLIC_ROUTES = new Set(["/", "/login", "/privacy", "/terms"]);
+export const PUBLIC_ROUTES = new Set(["/", "/login", "/privacy", "/terms", "/lista_attesa"]);
 
 /**
  * Prefissi pubblici: qualunque pathname che inizia con uno di questi
