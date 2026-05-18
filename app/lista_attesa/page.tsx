@@ -147,7 +147,12 @@ export default function MioDottoreAssistant() {
     setTemplates(templates.map(t => t.id === id ? { ...t, title: newTitle } : t));
 
   return (
-    <div className="flex flex-col w-full md:h-screen bg-white text-black font-sans md:overflow-hidden">
+    /* 
+      FIX CHIAVE 1: "h-auto md:h-screen" e "overflow-y-auto md:overflow-hidden"
+      Su mobile l'altezza è fluida, ma diciamo esplicitamente che se serve può scrollare.
+      "touch-auto" assicura che i gesti del telefono (pan/scroll) non vengano intercettati male.
+    */
+    <div className="flex flex-col w-full h-auto md:h-screen bg-white text-black font-sans overflow-y-auto md:overflow-hidden touch-auto">
 
       {/* HEADER */}
       <header className="shrink-0 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-4 border-b border-gray-100">
@@ -161,8 +166,9 @@ export default function MioDottoreAssistant() {
         </div>
       </header>
 
-      {/* BODY — mobile: flusso libero; desktop: flex con overflow interno */}
-      <div className="flex flex-col md:flex-row md:flex-1 md:overflow-hidden">
+      {/* BODY */}
+      {/* FIX CHIAVE 2: Rimosso completamente h-full su mobile che causava blocchi collaterali */}
+      <div className="flex flex-col flex-1 md:flex-row md:overflow-hidden">
 
         <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 md:flex md:flex-col bg-gray-50/50">
           <div className="p-4 space-y-2 md:flex-1 md:overflow-y-auto">
@@ -171,7 +177,7 @@ export default function MioDottoreAssistant() {
             {templates.map(t => {
               const isOpen = selectedId === t.id;
               return (
-                <div key={t.id}>
+                <div key={t.id} className="block">
                   <button
                     onClick={() => setSelectedId(isOpen ? "" : t.id)}
                     className={`w-full text-left p-3 md:p-2 rounded-lg transition-all flex justify-between items-center group ${isOpen ? 'bg-zinc-900 text-white shadow-lg' : 'hover:bg-zinc-100 text-zinc-600'}`}
@@ -194,13 +200,8 @@ export default function MioDottoreAssistant() {
                     </div>
                   </button>
 
-                  {/*
-                    FIX SCROLL MOBILE:
-                    Rimosso max-h + overflow-hidden che imprigionava il contenuto.
-                    Ora uso block/hidden: il pannello si espande nel flusso normale
-                    della pagina e il browser fa lo scroll nativo senza impedimenti.
-                  */}
-                  <div className={`md:hidden mt-1 mb-3 ${isOpen ? 'block' : 'hidden'}`}>
+                  {/* FIX CHIAVE 3: Aggiunto overscroll-contain per evitare conflitti di scroll nativi */}
+                  <div className={`md:hidden mt-1 mb-3 overscroll-contain ${isOpen ? 'block' : 'hidden'}`}>
                     <div className="p-3 bg-white rounded-lg border border-gray-100 shadow-sm">
                       <EditorArea
                         templateId={t.id}
@@ -250,7 +251,7 @@ export default function MioDottoreAssistant() {
 
       {/* FOOTER */}
       <footer className="shrink-0 border-t border-gray-100 px-4 py-3 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-1">
-        <p className="text-[11px] text-gray-400 font-medium">Messaggi Standard</p>
+        <p className="text-[11px] text-gray-400 font-medium">Messaggi Standard · MioDottore Assistant</p>
         <p className="text-[11px] text-gray-300">I dati rimangono nel browser — nessun invio a server esterni.</p>
       </footer>
 
